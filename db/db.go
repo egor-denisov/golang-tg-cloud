@@ -31,17 +31,17 @@ func (db *DataBase) Close() {
 	db.database.Close()
 }
 
-func (db *DataBase) Insert(req string, args ...interface{}) (int64, error) {
-	var id int64
+func (db *DataBase) Insert(req string, args ...interface{}) (string, error) {
+	id := ""
 	err := db.database.QueryRow(req, args...).Scan(&id)
 	if err != nil {
-		return -1, e.Wrap("can`t insert to database", err)
+		return "", e.Wrap("can`t insert to database", err)
 	}
 	return id, nil
 }
 
-func (db *DataBase) Exist(req string) (bool, error) {
-	id := -1
+func (db *DataBase) GetId(req string) (string, error) {
+	id := ""
 	db.database.QueryRow(req).Scan(&id)
-	return id != -1, nil
+	return id, nil
 }

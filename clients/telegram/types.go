@@ -9,14 +9,24 @@ type Content struct {
 }
 
 type User struct {
-	Id int64
+	Id int
 	UserName string
-	UserId int64
+	UserId int
 	FirstName string
 	LastName string
 }
 
 type Directory struct {
+	Id int
 	Name string
 	Files []int
+	Size int
+}
+
+type File struct {
+	Id int
+	Name string
+	FileId string
+	FileUniqueId string
+	FileSize int
 }

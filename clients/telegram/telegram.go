@@ -62,7 +62,7 @@ func (cl *TgClient) proccessMessage(msg *tgbotapi.Message) (err error) {
 		case "start":
 			content.Text = "Hello! Send me a file or create a new folder"
 			userInfo := User{
-				Id: msg.From.ID,
+				UserId: int(msg.From.ID),
 				UserName: msg.From.UserName,
 				FirstName: msg.From.FirstName,
 				LastName: msg.From.LastName,
@@ -87,6 +87,16 @@ func (cl *TgClient) proccessMessage(msg *tgbotapi.Message) (err error) {
 			Photo: msg.Photo,
 		}
 	}else if msg.Document != nil {
+		fileInfo := File{
+			Name: msg.Document.FileName,
+			FileId: msg.Document.FileID,
+			FileUniqueId: msg.Document.FileUniqueID,
+			FileSize: msg.Document.FileSize,
+		}
+		_, err := createNewFile(cl.db, fileInfo)
+		if err != nil {	
+			return err
+		}
 		content = Content{
 			Document: msg.Document,
 		}
