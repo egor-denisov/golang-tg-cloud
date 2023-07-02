@@ -40,9 +40,18 @@ func (cl *TgClient) Listen() {
 		if update.Message == nil {
 			continue
 		}
-
-		if err := cl.proccessMessage(update.Message); err != nil {
-			cl.sendMessage(update.Message.Chat.ID, Content{Text: "Sorry, i can`t understand what u want to do :("})
+		err := cl.proccessMessage(update.Message)
+		answer := ""
+		if err != nil {
+			switch err.Error() {
+			case "directory or user not found!": 
+				answer = "You need create account before sending files! For it send me /start"
+			case "user already exists":
+				answer = "You already have account!"
+			default: 
+				answer = "Sorry, i can`t understand what u want to do :("
+			}
+			cl.sendMessage(update.Message.Chat.ID, Content{Text: answer})
 			log.Print(err)
 			continue
 		}
@@ -68,9 +77,7 @@ func (cl *TgClient) proccessMessage(msg *tgbotapi.Message) (err error) {
 				LastName: msg.From.LastName,
 			}
 			_, err := createNewUser(cl.db, userInfo)
-			if err.Error() == "user already exists" {
-				content.Text = "You already have account!"
-			}else if err != nil {	
+			if err != nil {	
 				return err
 			}
 		case "search":
@@ -93,7 +100,7 @@ func (cl *TgClient) proccessMessage(msg *tgbotapi.Message) (err error) {
 			FileUniqueId: msg.Document.FileUniqueID,
 			FileSize: msg.Document.FileSize,
 		}
-		_, err := createNewFile(cl.db, fileInfo)
+		_, err := createNewFile(cl.db, int(msg.From.ID), fileInfo)
 		if err != nil {	
 			return err
 		}

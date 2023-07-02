@@ -40,8 +40,16 @@ func (db *DataBase) Insert(req string, args ...interface{}) (string, error) {
 	return id, nil
 }
 
-func (db *DataBase) GetId(req string) (string, error) {
-	id := ""
-	db.database.QueryRow(req).Scan(&id)
-	return id, nil
+func (db *DataBase) RawSelect(req string) (string, error) {
+	res := ""
+	db.database.QueryRow(req).Scan(&res)
+	return res, nil
+}
+
+func (db *DataBase) MakeQuery(req string) error {
+	_, err := db.database.Exec(req)
+	if err != nil {
+		return e.Wrap("can`t make query", err)
+	}
+	return nil
 }
