@@ -20,6 +20,7 @@ type Directory struct {
 	Id int
 	Name string
 	Files []int
+	Directories []int
 	Size int
 }
 

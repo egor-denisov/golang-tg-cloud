@@ -5,6 +5,8 @@ import (
 	"log"
 	"main/db"
 	"main/lib/e"
+	"strconv"
+	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -41,17 +43,9 @@ func (cl *TgClient) Listen() {
 			continue
 		}
 		err := cl.proccessMessage(update.Message)
-		answer := ""
 		if err != nil {
-			switch err.Error() {
-			case "directory or user not found!": 
-				answer = "You need create account before sending files! For it send me /start"
-			case "user already exists":
-				answer = "You already have account!"
-			default: 
-				answer = "Sorry, i can`t understand what u want to do :("
-			}
-			cl.sendMessage(update.Message.Chat.ID, Content{Text: answer})
+			answer := Content{Text: proccessError(err)}
+			cl.sendMedia(update.Message.Chat.ID, answer)
 			log.Print(err)
 			continue
 		}
@@ -63,6 +57,7 @@ func (cl *TgClient) proccessMessage(msg *tgbotapi.Message) (err error) {
 	defer func() { err = e.WrapIfErr("can`t proccess message", err) }()
 
 	var content Content
+
 	if msg.IsCommand() {
 		content = Content{}
 		switch msg.Command() {
@@ -82,8 +77,16 @@ func (cl *TgClient) proccessMessage(msg *tgbotapi.Message) (err error) {
 			}
 		case "search":
 			content.Text = "Input search string."
-		case "showAll":
-			content.Text = "Show all files in current directory"
+		case "show_all":
+			files, err := getAvailableFiles(cl.db, strconv.Itoa(int(msg.From.ID)))
+			if err != nil {
+				return err
+			}
+			directories, err := getAvailableDirectories(cl.db, strconv.Itoa(int(msg.From.ID)))
+			if err != nil {
+				return err
+			}
+			content.Text = createTextKeyboard(directories, files)
 		case "mainFolder":
 			content.Text = "Jump to main directory"
 		default:
@@ -111,18 +114,16 @@ func (cl *TgClient) proccessMessage(msg *tgbotapi.Message) (err error) {
 		return errors.New("Unknown type of message")
 	}
 
-	if err := cl.sendMessage(msg.Chat.ID, content); err != nil{
+	if err := cl.sendMedia(msg.Chat.ID, content); err != nil{
 		return err
 	}
 	return nil
 }
 
-
-func (cl *TgClient) sendMessage(chatID int64, content Content) (err error) {
-	defer func() { err = e.WrapIfErr("can`t send message", err) }()
+func (cl *TgClient) sendMedia(chatID int64, content Content) (err error) {
+	defer func() { err = e.WrapIfErr("can`t send media", err) }()
 
 	var msg tgbotapi.Chattable
-
 	if content.Document != nil {
 		msg = tgbotapi.NewDocument(chatID, tgbotapi.FileID(content.Document.FileID))
 	}else if content.Photo != nil {
@@ -138,3 +139,67 @@ func (cl *TgClient) sendMessage(chatID int64, content Content) (err error) {
 	}
 	return nil
 }
+
+func createKeyboardNavigator(directories []Directory, files []File) tgbotapi.ReplyKeyboardMarkup {
+	var rows []tgbotapi.KeyboardButton
+	
+	for _, file := range files {
+		current := tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton(file.Name),
+		)
+		rows = append(rows, current[0])
+	}
+
+	for _, dir := range directories {
+		current := tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton(dir.Name),
+		)
+		rows = append(rows, current[0])
+	}
+
+	goBackBtn := tgbotapi.NewKeyboardButtonRow(
+		tgbotapi.NewKeyboardButton("../"),
+	)
+	rows = append(rows, goBackBtn[0])
+	return tgbotapi.NewOneTimeReplyKeyboard(rows)
+}
+
+func proccessError(err error) string {
+
+	switch err.Error() {
+		case "directory or user not found!": 
+			return "You need create account before sending files! For it send me /start"
+		case "user already exists":
+			return "You already have account!"
+		default: 
+			return "Sorry, i can`t understand what u want to do :("
+	}
+}
+
+
+
+
+
+
+
+
+
+
+func createTextKeyboard(directories []Directory, files []File) string {
+	var rows []string
+	
+	for _, file := range files {
+		rows = append(rows, file.Name)
+	}
+
+	for _, dir := range directories {
+		rows = append(rows, dir.Name)
+	}
+
+	rows = append(rows, "../")
+	return strings.Join(rows, "\n")
+}
+
+
+
+

@@ -12,6 +12,7 @@ CREATE TABLE directories
    	Id serial PRIMARY KEY,
     Name varchar(255),
     Files integer[],
+    Directories integer[],
     Size integer
 );
 
