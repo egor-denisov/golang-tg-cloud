@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"main/db"
+	"main/helper"
 	"strconv"
 	"strings"
 )
@@ -16,7 +17,7 @@ func createNewDirectory(db db.DataBase, directory Directory) (string, error) {
 
 func createNewFile(db db.DataBase, userId int, file File) (string, error) {
 	fileId := ""
-	id, err := getFileId(db, file.FileId)
+	id, err := getIdOfFile(db, file.FileUniqueId)
 	if err != nil {
 		return "", err
 	}
@@ -34,6 +35,7 @@ func createNewFile(db db.DataBase, userId int, file File) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	err = addFileToDirectory(db, directoryId, fileId)
 	if err != nil {
 		return "", err
@@ -42,8 +44,17 @@ func createNewFile(db db.DataBase, userId int, file File) (string, error) {
 }
 
 func addFileToDirectory(db db.DataBase, directoryId string, fileId string) error {
+	currentFiles, err := getIdsArray(db, directoryId, "files")
+	if err != nil {
+		return err
+	}
+	id, _ := strconv.Atoi(fileId)
+	if helper.Contains(currentFiles, id) {
+		return fmt.Errorf("file already exists in folder")
+	}
+
 	req := fmt.Sprintf("update directories set files = array_append(files, %s) where id = %s", fileId, directoryId)
-	err := db.MakeQuery(req)
+	err = db.MakeQuery(req)
 	if err != nil {
 		return err
 	}
@@ -77,8 +88,8 @@ func userExists(db db.DataBase, userId string) (bool, error) {
 	return id != "", nil
 }
 
-func getFileId(db db.DataBase, fileId string) (string, error) {
-	req := fmt.Sprintf("select id from files where fileId = %s", fileId)
+func getIdOfFile(db db.DataBase, fileUniqueId string) (string, error) {
+	req := fmt.Sprintf("select id from files where fileUniqueId = '%s'", fileUniqueId)
 	id, err := db.SelectRow(req)
 	if err != nil {
 		return "", err
@@ -185,7 +196,9 @@ func getIdsArray(db db.DataBase, id string, name string) ([]int, error) {
 
 func parseIds(jsonBuffer string) ([]int, error) {
 	ids := []int{}
-
+	if len(jsonBuffer) == 0 {
+		return ids, nil
+	}
 	jsonBuffer = strings.Replace(jsonBuffer, "{", "[", -1)
 	jsonBuffer = strings.Replace(jsonBuffer, "}", "]", -1)
 

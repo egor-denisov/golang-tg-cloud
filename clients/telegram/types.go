@@ -6,6 +6,7 @@ type Content struct {
 	Text     string
 	Document *tgbotapi.Document
 	Photo    []tgbotapi.PhotoSize
+	Keyboard tgbotapi.ReplyKeyboardMarkup
 }
 
 type User struct {

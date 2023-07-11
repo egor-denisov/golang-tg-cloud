@@ -7,6 +7,7 @@ import (
 	"main/lib/e"
 )
 
+
 func main() {
     log.Printf("App was started")
 	database, err := db.New()

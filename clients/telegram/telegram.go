@@ -6,7 +6,6 @@ import (
 	"main/db"
 	"main/lib/e"
 	"strconv"
-	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -78,15 +77,7 @@ func (cl *TgClient) proccessMessage(msg *tgbotapi.Message) (err error) {
 		case "search":
 			content.Text = "Input search string."
 		case "show_all":
-			files, err := getAvailableFiles(cl.db, strconv.Itoa(int(msg.From.ID)))
-			if err != nil {
-				return err
-			}
-			directories, err := getAvailableDirectories(cl.db, strconv.Itoa(int(msg.From.ID)))
-			if err != nil {
-				return err
-			}
-			content.Text = createTextKeyboard(directories, files)
+			content.Text = "Show all files and directories"
 		case "mainFolder":
 			content.Text = "Jump to main directory"
 		default:
@@ -113,8 +104,24 @@ func (cl *TgClient) proccessMessage(msg *tgbotapi.Message) (err error) {
 	}else{
 		return errors.New("Unknown type of message")
 	}
+	
+	if err := cl.makeReplyAfterAdding(msg.From.ID); err != nil{
+		return err
+	}
+	return nil
+}
 
-	if err := cl.sendMedia(msg.Chat.ID, content); err != nil{
+func (cl *TgClient) makeReplyAfterAdding(userId int64) (err error) {
+	defer func() { err = e.WrapIfErr("can`t make reply after adding", err) }()
+
+	keyboard, err := cl.instantiateKeyboardNavigator(userId)
+
+	replyContent := Content{
+		Text: "File successfully added",
+		Keyboard: keyboard,
+	}
+
+	if err := cl.sendMedia(userId, replyContent); err != nil{
 		return err
 	}
 	return nil
@@ -129,7 +136,14 @@ func (cl *TgClient) sendMedia(chatID int64, content Content) (err error) {
 	}else if content.Photo != nil {
 		msg = tgbotapi.NewPhoto(chatID, tgbotapi.FileID(content.Photo[0].FileID))
 	}else if content.Text != "" {
-		msg = tgbotapi.NewMessage(chatID, content.Text)
+		msg := tgbotapi.NewMessage(chatID, content.Text)
+		if content.Keyboard.Keyboard != nil{
+			msg.ReplyMarkup = content.Keyboard
+		}
+		if _, err := cl.bot.Send(msg); err != nil {
+			return err
+		}
+		return nil
 	}else {
 		return errors.New("can`t find required type of message")
 	}
@@ -140,37 +154,50 @@ func (cl *TgClient) sendMedia(chatID int64, content Content) (err error) {
 	return nil
 }
 
+func (cl *TgClient) instantiateKeyboardNavigator(userID int64) (tgbotapi.ReplyKeyboardMarkup, error) {
+	files, err := getAvailableFiles(cl.db, strconv.Itoa(int(userID)))
+	if err != nil {
+		return tgbotapi.ReplyKeyboardMarkup{}, err
+	}
+	directories, err := getAvailableDirectories(cl.db, strconv.Itoa(int(userID)))
+	if err != nil {
+		return tgbotapi.ReplyKeyboardMarkup{}, err
+	}
+	return createKeyboardNavigator(directories, files), nil
+}
+
 func createKeyboardNavigator(directories []Directory, files []File) tgbotapi.ReplyKeyboardMarkup {
-	var rows []tgbotapi.KeyboardButton
-	
+	rows := [][]tgbotapi.KeyboardButton{}
 	for _, file := range files {
 		current := tgbotapi.NewKeyboardButtonRow(
 			tgbotapi.NewKeyboardButton(file.Name),
 		)
-		rows = append(rows, current[0])
+		rows = append(rows, current)
 	}
 
 	for _, dir := range directories {
 		current := tgbotapi.NewKeyboardButtonRow(
 			tgbotapi.NewKeyboardButton(dir.Name),
 		)
-		rows = append(rows, current[0])
+		rows = append(rows, current)
 	}
 
 	goBackBtn := tgbotapi.NewKeyboardButtonRow(
 		tgbotapi.NewKeyboardButton("../"),
 	)
-	rows = append(rows, goBackBtn[0])
-	return tgbotapi.NewOneTimeReplyKeyboard(rows)
+	rows = append(rows, goBackBtn)
+	
+	return tgbotapi.NewOneTimeReplyKeyboard(rows...)
 }
 
 func proccessError(err error) string {
-
 	switch err.Error() {
 		case "directory or user not found!": 
 			return "You need create account before sending files! For it send me /start"
 		case "user already exists":
 			return "You already have account!"
+		case "can`t proccess message: file already exists in folder":
+			return "This file already in folder"
 		default: 
 			return "Sorry, i can`t understand what u want to do :("
 	}
@@ -185,20 +212,20 @@ func proccessError(err error) string {
 
 
 
-func createTextKeyboard(directories []Directory, files []File) string {
-	var rows []string
+// func createTextKeyboard(directories []Directory, files []File) string {
+// 	var rows []string
 	
-	for _, file := range files {
-		rows = append(rows, file.Name)
-	}
+// 	for _, file := range files {
+// 		rows = append(rows, file.Name)
+// 	}
 
-	for _, dir := range directories {
-		rows = append(rows, dir.Name)
-	}
+// 	for _, dir := range directories {
+// 		rows = append(rows, dir.Name)
+// 	}
 
-	rows = append(rows, "../")
-	return strings.Join(rows, "\n")
-}
+// 	rows = append(rows, "../")
+// 	return strings.Join(rows, "\n")
+// }
 
 
 
