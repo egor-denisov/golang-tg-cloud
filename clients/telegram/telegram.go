@@ -83,9 +83,21 @@ func (cl *TgClient) proccessMessage(msg *tgbotapi.Message) (err error) {
 		default:
 			content.Text = "I don't know that command"
 		}
+		if err := cl.sendMedia(msg.Chat.ID, content); err != nil {
+			return err
+		}
+		return nil
 	}else if msg.Photo != nil {
-		content = Content{
-			Photo: msg.Photo,
+		fileInfo := File{
+			Name: "photo" + msg.Photo[0].FileUniqueID,
+			FileId: msg.Photo[0].FileID,
+			FileUniqueId: msg.Photo[0].FileUniqueID,
+			FileSize: msg.Photo[0].FileSize,
+		}
+		
+		_, err := createNewFile(cl.db, int(msg.From.ID), fileInfo)
+		if err != nil {	
+			return err
 		}
 	}else if msg.Document != nil {
 		fileInfo := File{
@@ -94,13 +106,16 @@ func (cl *TgClient) proccessMessage(msg *tgbotapi.Message) (err error) {
 			FileUniqueId: msg.Document.FileUniqueID,
 			FileSize: msg.Document.FileSize,
 		}
+
 		_, err := createNewFile(cl.db, int(msg.From.ID), fileInfo)
 		if err != nil {	
 			return err
 		}
-		content = Content{
-			Document: msg.Document,
+	}else if msg.Text != ""{
+		if err := cl.MakeReplyAfterRequest(msg.From.ID, msg.Text); err != nil{
+			return err
 		}
+		return nil
 	}else{
 		return errors.New("Unknown type of message")
 	}
@@ -123,6 +138,38 @@ func (cl *TgClient) makeReplyAfterAdding(userId int64) (err error) {
 
 	if err := cl.sendMedia(userId, replyContent); err != nil{
 		return err
+	}
+	return nil
+}
+
+func (cl *TgClient) MakeReplyAfterRequest(userId int64, fileName string) (err error) {
+	defer func() { err = e.WrapIfErr("can`t make reply after adding", err) }()
+
+	file, err := getFileByName(cl.db, fileName) 
+	if err != nil {
+		return err
+	}
+
+	if(file.Name[:5] == "photo") {
+		var photo []tgbotapi.PhotoSize
+		photo = append(photo, tgbotapi.PhotoSize{
+			FileID: file.FileId,
+			FileUniqueID: file.FileUniqueId,
+			FileSize: file.FileSize,
+		}) 
+		if err := cl.sendMedia(userId, Content{Photo: photo}); err != nil{
+			return err
+		}
+	}else{
+		document := tgbotapi.Document{
+			FileID: file.FileId,
+			FileUniqueID: file.FileUniqueId,
+			FileName: file.Name,
+			FileSize: file.FileSize,
+		}
+		if err := cl.sendMedia(userId, Content{Document: &document}); err != nil{
+			return err
+		}
 	}
 	return nil
 }
@@ -168,6 +215,13 @@ func (cl *TgClient) instantiateKeyboardNavigator(userID int64) (tgbotapi.ReplyKe
 
 func createKeyboardNavigator(directories []Directory, files []File) tgbotapi.ReplyKeyboardMarkup {
 	rows := [][]tgbotapi.KeyboardButton{}
+
+	createNewFolderBtn := tgbotapi.NewKeyboardButtonRow(
+		tgbotapi.NewKeyboardButton("Create new folder"),
+	)
+
+	rows = append(rows, createNewFolderBtn)
+
 	for _, file := range files {
 		current := tgbotapi.NewKeyboardButtonRow(
 			tgbotapi.NewKeyboardButton(file.Name),

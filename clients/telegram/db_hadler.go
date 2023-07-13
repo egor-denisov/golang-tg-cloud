@@ -17,7 +17,7 @@ func createNewDirectory(db db.DataBase, directory Directory) (string, error) {
 
 func createNewFile(db db.DataBase, userId int, file File) (string, error) {
 	fileId := ""
-	id, err := getIdOfFile(db, file.FileUniqueId)
+	id, err := getIdOfFileByUniqueId(db, file.FileUniqueId)
 	if err != nil {
 		return "", err
 	}
@@ -88,7 +88,7 @@ func userExists(db db.DataBase, userId string) (bool, error) {
 	return id != "", nil
 }
 
-func getIdOfFile(db db.DataBase, fileUniqueId string) (string, error) {
+func getIdOfFileByUniqueId(db db.DataBase, fileUniqueId string) (string, error) {
 	req := fmt.Sprintf("select id from files where fileUniqueId = '%s'", fileUniqueId)
 	id, err := db.SelectRow(req)
 	if err != nil {
@@ -124,9 +124,24 @@ func getDirectory(db db.DataBase, id int) (Directory, error) {
 	return d, nil
 }
 
-func getFile(db db.DataBase, id int) (File, error) {
+func getFileById(db db.DataBase, id int) (File, error) {
 	f := File{}
 	req := fmt.Sprintf("select * from files where id = %d", id)
+	rows, err := db.Select(req)
+	if err != nil {
+		return f, err
+	}
+	rows.Next()
+	err = rows.Scan(&f.Id, &f.Name, &f.FileId, &f.FileUniqueId, &f.FileSize)
+	if err != nil {
+		return f, err
+	}
+	return f, nil
+}
+
+func getFileByName(db db.DataBase, name string) (File, error) {
+	f := File{}
+	req := fmt.Sprintf("select * from files where name = '%s'", name)
 	rows, err := db.Select(req)
 	if err != nil {
 		return f, err
@@ -171,7 +186,7 @@ func getAvailableFiles(db db.DataBase, userId string) ([]File, error) {
 	arr, err := getIdsArray(db, directoryId, "files")
 
 	for _, id := range arr {
-		d, err := getFile(db, id)
+		d, err := getFileById(db, id)
 		if err != nil {
 			return res, err
 		}
