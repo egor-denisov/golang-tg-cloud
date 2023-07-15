@@ -24,18 +24,8 @@ Live demo is available here:
 - [Telegram bot](https://t.me/StorageTest1Bot);
 - Web version [currently unavailable].
 ## Final product
-- Startpage lightmode:
-![](https://sun9-east.userapi.com/sun9-23/s/v1/ig2/3VWoMe1ZvQJgA0tkF7tpffCN-Gi_kWHBy5JkAgJaBOMH507KWkV87GYnTrRg5_Z0rogZWjuKckvPP9l0fMjgTiDq.jpg?size=1918x930&quality=95&type=album "Start page lightmode")
 
-- Startpage darkmode:
-![](https://sun9-north.userapi.com/sun9-80/s/v1/ig2/BasdB0MbfeCsr1KphBKqEqFGHP4z3ar_IsmuIgrtSSfncIkARqar6D-Xl52JsjktJERYcW2Ja0CeJowa-U2xvkaQ.jpg?size=1911x920&quality=95&type=album "Start page darkmode")
-
-- Ships placement page:
-![](https://sun9-west.userapi.com/sun9-68/s/v1/ig2/jCUxjO4MKKgyvnHoSCYquzt4esWGZEdtPy4QYKJ4ROlNIE5rz7dyL3FDgiqC3Exc7QF0tX4u3ahTAAfTwpY6mhqn.jpg?size=1914x917&quality=95&type=album "Ships placement page")
-
-- Battle page:
-![](https://sun9-east.userapi.com/sun9-25/s/v1/ig2/wneNRVCZIsHxVwyIZEqUxQ8gpdCErEaJ-zUfasAZFAg9LfDTNGeFVboCEOlfmABPI8p3_TeNa_SXJ7Yh4qMFqfWn.jpg?size=1913x923&quality=95&type=album "Battle page")
-
+This part is in development...
 
 ## Running the project
 1) For starting Telegram version you need get token from https://t.me/BotFather. 
