@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"main/db"
 	"main/lib/e"
@@ -41,8 +42,8 @@ func (cl *TgClient) Listen() {
 		if update.Message == nil {
 			continue
 		}
-		err := cl.proccessMessage(update.Message)
-		if err != nil {
+		
+		if err := cl.proccessMessage(update.Message); err != nil {
 			answer := Content{Text: proccessError(err)}
 			cl.sendMedia(update.Message.Chat.ID, answer)
 			log.Print(err)
@@ -55,84 +56,59 @@ func (cl *TgClient) Listen() {
 func (cl *TgClient) proccessMessage(msg *tgbotapi.Message) (err error) {
 	defer func() { err = e.WrapIfErr("can`t proccess message", err) }()
 
-	var content Content
-
 	if msg.IsCommand() {
-		content = Content{}
-		switch msg.Command() {
-		case "help":
-			content.Text = "You can use /search for search file. Also you can see all files in current directory with /showAll."
-		case "start":
-			content.Text = "Hello! Send me a file or create a new folder"
-			userInfo := User{
-				UserId: int(msg.From.ID),
-				UserName: msg.From.UserName,
-				FirstName: msg.From.FirstName,
-				LastName: msg.From.LastName,
-			}
-			_, err := createNewUser(cl.db, userInfo)
-			if err != nil {	
-				return err
-			}
-		case "search":
-			content.Text = "Input search string."
-		case "show_all":
-			content.Text = "Show all files and directories"
-		case "mainFolder":
-			content.Text = "Jump to main directory"
-		default:
-			content.Text = "I don't know that command"
-		}
-		if err := cl.sendMedia(msg.Chat.ID, content); err != nil {
-			return err
-		}
-		return nil
-	}else if msg.Photo != nil {
-		fileInfo := File{
+		return cl.proccessCommand(msg)
+	}else if msg.Photo != nil || msg.Document != nil {
+		return cl.proccessFile(msg)
+	}else if msg.Text != ""{
+		return cl.proccessText(msg)
+	}
+
+	return errors.New("Unknown type of message")
+}
+
+func (cl *TgClient) proccessFile(msg *tgbotapi.Message) error {
+	var fileInfo File
+	if msg.Photo != nil {
+		fileInfo = File{
 			Name: "photo" + msg.Photo[0].FileUniqueID,
 			FileId: msg.Photo[0].FileID,
 			FileUniqueId: msg.Photo[0].FileUniqueID,
 			FileSize: msg.Photo[0].FileSize,
 		}
-		
-		_, err := createNewFile(cl.db, int(msg.From.ID), fileInfo)
-		if err != nil {	
-			return err
-		}
-	}else if msg.Document != nil {
-		fileInfo := File{
+	}else{
+		fileInfo = File{
 			Name: msg.Document.FileName,
 			FileId: msg.Document.FileID,
 			FileUniqueId: msg.Document.FileUniqueID,
 			FileSize: msg.Document.FileSize,
 		}
+	}
 
-		_, err := createNewFile(cl.db, int(msg.From.ID), fileInfo)
-		if err != nil {	
-			return err
-		}
-	}else if msg.Text != ""{
-		if err := cl.MakeReplyAfterRequest(msg.From.ID, msg.Text); err != nil{
-			return err
-		}
-		return nil
-	}else{
-		return errors.New("Unknown type of message")
+	if _, err := createNewFile(cl.db, msg.From.ID, fileInfo); err != nil {	
+		return err
 	}
 	
-	if err := cl.makeReplyAfterAdding(msg.From.ID); err != nil{
+	if err := cl.makeReplyAfterAdding(msg.From.ID, fileInfo.Name); err != nil{
 		return err
 	}
 	return nil
 }
 
-func (cl *TgClient) makeReplyAfterAdding(userId int64) (err error) {
+func (cl *TgClient) proccessText(msg *tgbotapi.Message) error{
+	if err := cl.makeReplyAfterRequest(msg.From.ID, msg.Text); err != nil{
+		return err
+	}
+	return nil
+}
+
+func (cl *TgClient) makeReplyAfterAdding(userId int64, fileName string) (err error) {
 	defer func() { err = e.WrapIfErr("can`t make reply after adding", err) }()
 
 	keyboard, err := cl.instantiateKeyboardNavigator(userId)
 
 	replyContent := Content{
-		Text: "File successfully added",
+		Text: fmt.Sprintf("File %s successfully added", fileName),
 		Keyboard: keyboard,
 	}
 
@@ -142,15 +118,29 @@ func (cl *TgClient) makeReplyAfterAdding(userId int64) (err error) {
 	return nil
 }
 
-func (cl *TgClient) MakeReplyAfterRequest(userId int64, fileName string) (err error) {
-	defer func() { err = e.WrapIfErr("can`t make reply after adding", err) }()
+func (cl *TgClient) makeReplyAfterRequest(userId int64, fileName string) (err error) {
+	defer func() { err = e.WrapIfErr("can`t make reply after requesting", err) }()
+
+	isAvailable := false
+
+	availableFiles, err := getAvailableFiles(cl.db, strconv.Itoa(int(userId)))
+	for _, f := range availableFiles {
+		if f.Name == fileName {
+			isAvailable = true
+			break
+		}
+	}
+
+	if !isAvailable {
+		return fmt.Errorf("file is not available from this folder")
+	}
 
 	file, err := getFileByName(cl.db, fileName) 
 	if err != nil {
 		return err
 	}
 
-	if(file.Name[:5] == "photo") {
+	if file.Name[:5] == "photo" {
 		var photo []tgbotapi.PhotoSize
 		photo = append(photo, tgbotapi.PhotoSize{
 			FileID: file.FileId,
@@ -174,6 +164,21 @@ func (cl *TgClient) MakeReplyAfterRequest(userId int64, fileName string) (err er
 	return nil
 }
 
+func (cl *TgClient) makeReplyAfterCreatingDirectory(userId int64, directoryName string) (err error) {
+	defer func() { err = e.WrapIfErr("can`t make reply after creating directory", err) }()
+	
+	keyboard, err := cl.instantiateKeyboardNavigator(userId)
+	replyContent := Content{
+		Text: fmt.Sprintf("Directory %s created successfully", directoryName),
+		Keyboard: keyboard,
+	}
+
+	if err := cl.sendMedia(userId, replyContent); err != nil{
+		return err
+	}
+	return nil
+}
+
 func (cl *TgClient) sendMedia(chatID int64, content Content) (err error) {
 	defer func() { err = e.WrapIfErr("can`t send media", err) }()
 
@@ -184,7 +189,7 @@ func (cl *TgClient) sendMedia(chatID int64, content Content) (err error) {
 		msg = tgbotapi.NewPhoto(chatID, tgbotapi.FileID(content.Photo[0].FileID))
 	}else if content.Text != "" {
 		msg := tgbotapi.NewMessage(chatID, content.Text)
-		if content.Keyboard.Keyboard != nil{
+		if content.Keyboard != nil{
 			msg.ReplyMarkup = content.Keyboard
 		}
 		if _, err := cl.bot.Send(msg); err != nil {
@@ -201,86 +206,21 @@ func (cl *TgClient) sendMedia(chatID int64, content Content) (err error) {
 	return nil
 }
 
-func (cl *TgClient) instantiateKeyboardNavigator(userID int64) (tgbotapi.ReplyKeyboardMarkup, error) {
-	files, err := getAvailableFiles(cl.db, strconv.Itoa(int(userID)))
-	if err != nil {
-		return tgbotapi.ReplyKeyboardMarkup{}, err
-	}
-	directories, err := getAvailableDirectories(cl.db, strconv.Itoa(int(userID)))
-	if err != nil {
-		return tgbotapi.ReplyKeyboardMarkup{}, err
-	}
-	return createKeyboardNavigator(directories, files), nil
-}
-
-func createKeyboardNavigator(directories []Directory, files []File) tgbotapi.ReplyKeyboardMarkup {
-	rows := [][]tgbotapi.KeyboardButton{}
-
-	createNewFolderBtn := tgbotapi.NewKeyboardButtonRow(
-		tgbotapi.NewKeyboardButton("Create new folder"),
-	)
-
-	rows = append(rows, createNewFolderBtn)
-
-	for _, file := range files {
-		current := tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton(file.Name),
-		)
-		rows = append(rows, current)
-	}
-
-	for _, dir := range directories {
-		current := tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton(dir.Name),
-		)
-		rows = append(rows, current)
-	}
-
-	goBackBtn := tgbotapi.NewKeyboardButtonRow(
-		tgbotapi.NewKeyboardButton("../"),
-	)
-	rows = append(rows, goBackBtn)
-	
-	return tgbotapi.NewOneTimeReplyKeyboard(rows...)
-}
-
 func proccessError(err error) string {
 	switch err.Error() {
-		case "directory or user not found!": 
+		case "can`t proccess message: directory or user not found!": 
 			return "You need create account before sending files! For it send me /start"
-		case "user already exists":
+		case "can`t proccess message: user already exists":
 			return "You already have account!"
 		case "can`t proccess message: file already exists in folder":
 			return "This file already in folder"
+		case "can`t proccess message: directory with this name already exists in current folder":
+			return "Directory with this name already exists in current folder"
+		case "can`t proccess message: wrong folder name":
+			return "Sorry, but folder cannot have this name"
+		case "can`t proccess message: can`t make reply after requesting: file is not available from this folder":
+			return "Sorry, this file does not exist"
 		default: 
-			return "Sorry, i can`t understand what u want to do :("
+			return "Sorry, i can`t understand u want to do :("
 	}
 }
-
-
-
-
-
-
-
-
-
-
-// func createTextKeyboard(directories []Directory, files []File) string {
-// 	var rows []string
-	
-// 	for _, file := range files {
-// 		rows = append(rows, file.Name)
-// 	}
-
-// 	for _, dir := range directories {
-// 		rows = append(rows, dir.Name)
-// 	}
-
-// 	rows = append(rows, "../")
-// 	return strings.Join(rows, "\n")
-// }
-
-
-
-

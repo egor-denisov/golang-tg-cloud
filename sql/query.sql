@@ -4,16 +4,17 @@ CREATE TABLE files
     Name varchar(255),
     FileId varchar(255),
     FileUniqueId varchar(255),
-    FileSize integer
+    FileSize integer DEFAULT 0
 );
 
 CREATE TABLE directories
 (
    	Id serial PRIMARY KEY,
     Name varchar(255),
+    UserID integer,
     Files integer[],
     Directories integer[],
-    Size integer
+    Size integer DEFAULT 0
 );
 
 CREATE TABLE users

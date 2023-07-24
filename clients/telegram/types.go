@@ -6,7 +6,7 @@ type Content struct {
 	Text     string
 	Document *tgbotapi.Document
 	Photo    []tgbotapi.PhotoSize
-	Keyboard tgbotapi.ReplyKeyboardMarkup
+	Keyboard interface{}
 }
 
 type User struct {
@@ -20,6 +20,7 @@ type User struct {
 type Directory struct {
 	Id int
 	Name string
+	UserId int
 	Files []int
 	Directories []int
 	Size int
