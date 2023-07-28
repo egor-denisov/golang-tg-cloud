@@ -59,7 +59,8 @@ func createFolderCommand(cl *TgClient, msg *tgbotapi.Message) error {
 	if !h.IsValidName(directory.Name) {
 		return fmt.Errorf("wrong folder name")
 	}
-
+	directory.Name = "./" + directory.Name
+	
 	if _, err := createNewDirectory(cl.db, msg.From.ID, directory); err != nil {	
 		return err
 	}

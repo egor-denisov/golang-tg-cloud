@@ -6,7 +6,6 @@ import (
 	"log"
 	"main/db"
 	"main/lib/e"
-	"strconv"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -96,7 +95,13 @@ func (cl *TgClient) proccessFile(msg *tgbotapi.Message) error {
 }
 
 func (cl *TgClient) proccessText(msg *tgbotapi.Message) error{
-	if err := cl.makeReplyAfterRequest(msg.From.ID, msg.Text); err != nil{
+	if msg.Text[:2] == "./" || msg.Text[:3] == "../" {
+		if err := cl.makeReplyAfterRequestingDirectory(msg.From.ID, msg.Text); err != nil{
+			return err
+		}
+		return nil
+	}
+	if err := cl.makeReplyAfterRequestingFile(msg.From.ID, msg.Text); err != nil{
 		return err
 	}
 	return nil
@@ -118,28 +123,24 @@ func (cl *TgClient) makeReplyAfterAdding(userId int64, fileName string) (err err
 	return nil
 }
 
-func (cl *TgClient) makeReplyAfterRequest(userId int64, fileName string) (err error) {
-	defer func() { err = e.WrapIfErr("can`t make reply after requesting", err) }()
+func (cl *TgClient) makeReplyAfterRequestingFile(userId int64, reqString string) (err error) {
+	defer func() { err = e.WrapIfErr("can`t make reply after requesting file", err) }()
 
-	isAvailable := false
+	var file File
 
-	availableFiles, err := getAvailableFiles(cl.db, strconv.Itoa(int(userId)))
+	availableFiles, err := getAvailableFiles(cl.db, userId)
 	for _, f := range availableFiles {
-		if f.Name == fileName {
-			isAvailable = true
+		if f.Name == reqString {
+			file = f
 			break
 		}
 	}
 
-	if !isAvailable {
+	if file.Name != reqString {
 		return fmt.Errorf("file is not available from this folder")
 	}
 
-	file, err := getFileByName(cl.db, fileName) 
-	if err != nil {
-		return err
-	}
-
+	var content Content
 	if file.Name[:5] == "photo" {
 		var photo []tgbotapi.PhotoSize
 		photo = append(photo, tgbotapi.PhotoSize{
@@ -147,9 +148,7 @@ func (cl *TgClient) makeReplyAfterRequest(userId int64, fileName string) (err er
 			FileUniqueID: file.FileUniqueId,
 			FileSize: file.FileSize,
 		}) 
-		if err := cl.sendMedia(userId, Content{Photo: photo}); err != nil{
-			return err
-		}
+		content = Content{Photo: photo}
 	}else{
 		document := tgbotapi.Document{
 			FileID: file.FileId,
@@ -157,10 +156,66 @@ func (cl *TgClient) makeReplyAfterRequest(userId int64, fileName string) (err er
 			FileName: file.Name,
 			FileSize: file.FileSize,
 		}
-		if err := cl.sendMedia(userId, Content{Document: &document}); err != nil{
+		content = Content{Document: &document}
+	}
+
+	if err := cl.sendMedia(userId, content); err != nil{
+		return err
+	}
+	return nil
+}
+
+func (cl *TgClient) makeReplyAfterRequestingDirectory(userId int64, reqString string) (err error) {
+	defer func() { err = e.WrapIfErr("can`t make reply after requesting directory", err) }()
+	
+	var directory Directory
+
+	if reqString == "../" {
+		currentDirectoryId, err := getCurrentDirectory(cl.db, userId)
+		if err != nil {
 			return err
 		}
+
+		directory, err = getParentDirectory(cl.db, currentDirectoryId)
+		if err != nil {
+			return err
+		}
+		
+	}else{
+		availableDirectory, err := getAvailableDirectories(cl.db, userId)
+		if err != nil {
+			return err
+		}
+		for _, d := range availableDirectory {
+			if d.Name == reqString {
+				directory = d
+				break
+			}
+		}
+
+		if directory.Name != reqString {
+			return fmt.Errorf("directory is not available from this folder")
+		}
 	}
+
+	if err := jumpToDirectory(cl.db, userId, directory.Id); err != nil {
+		return err
+	}
+
+	keyboard, err := cl.instantiateKeyboardNavigator(userId)
+	if err != nil {
+		return err
+	}
+
+	content := Content{
+		Text: fmt.Sprintf("Now you in '%s' folder", directory.Name),
+		Keyboard: keyboard,
+	}
+
+	if err := cl.sendMedia(userId, content); err != nil{
+		return err
+	}
+
 	return nil
 }
 
@@ -220,6 +275,8 @@ func proccessError(err error) string {
 			return "Sorry, but folder cannot have this name"
 		case "can`t proccess message: can`t make reply after requesting: file is not available from this folder":
 			return "Sorry, this file does not exist"
+		case "can`t proccess message: can`t make reply after requesting directory: this directory is root":
+			return "Sorry, this directory is root"
 		default: 
 			return "Sorry, i can`t understand u want to do :("
 	}

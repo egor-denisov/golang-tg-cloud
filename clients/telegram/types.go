@@ -19,6 +19,7 @@ type User struct {
 
 type Directory struct {
 	Id int
+	ParentId int
 	Name string
 	UserId int
 	Files []int

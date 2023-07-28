@@ -10,6 +10,7 @@ CREATE TABLE files
 CREATE TABLE directories
 (
    	Id serial PRIMARY KEY,
+    ParentId integer DEFAULT -1,
     Name varchar(255),
     UserID integer,
     Files integer[],

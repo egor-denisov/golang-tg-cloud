@@ -17,10 +17,11 @@ func createRootDirectory(db db.DataBase, directory Directory) (string, error) {
 
 func createNewDirectory(db db.DataBase, userId int64, directory Directory) (string, error) {
 
-	currentDirectoryId, err := getCurrentDirectory(db, strconv.Itoa(int(userId)))
+	currentDirectoryId, err := getCurrentDirectory(db, userId)
 	if err != nil {
 		return "", err
 	}
+	directory.ParentId = currentDirectoryId
 
 	existence, err := folderExists(db, userId, currentDirectoryId, directory.Name)
 	if err != nil {
@@ -29,26 +30,23 @@ func createNewDirectory(db db.DataBase, userId int64, directory Directory) (stri
 	if existence {
 		return "", fmt.Errorf("directory with this name already exists in current folder")
 	}
-
-	id, err := db.Insert("insert into directories (Name, UserId) values ($1, $2) returning Id", directory.Name, directory.UserId)
+	
+	id, err := db.Insert("insert into directories (ParentId, Name, UserId) values ($1, $2, $3) returning Id", 
+		currentDirectoryId, directory.Name, userId)
 	if err != nil {
 		return "", err
 	}
 
-	directory.Id, err = strconv.Atoi(id)
+	newDirectoryId, err := strconv.Atoi(id)
 	if err != nil {
 		return "", err
 	}
 
-	if err := addNewDirectoryToDirectory(db, currentDirectoryId, directory); err != nil {
-		return "", err
-	}
-
-	return id, err
+	return id, addNewDirectoryToDirectory(db, currentDirectoryId, newDirectoryId)
 }
 
 func createNewFile(db db.DataBase, userId int64, file File) (string, error) {
-	directoryId, err := getCurrentDirectory(db, strconv.Itoa(int(userId)))
+	directoryId, err := getCurrentDirectory(db, userId)
 	if err != nil {
 		return "", err
 	}
@@ -86,8 +84,8 @@ func createNewFile(db db.DataBase, userId int64, file File) (string, error) {
 	return strconv.Itoa(file.Id), nil
 }
 
-func addFileToDirectory(db db.DataBase, directoryId string, file File) error {
-	req := fmt.Sprintf("update directories set files = array_append(files, %d), size = size + %d where id = %s", file.Id, file.FileSize, directoryId)
+func addFileToDirectory(db db.DataBase, directoryId int, file File) error {
+	req := fmt.Sprintf("update directories set files = array_append(files, %d), size = size + %d where id = %d", file.Id, file.FileSize, directoryId)
 	err := db.MakeQuery(req)
 	if err != nil {
 		return err
@@ -95,7 +93,7 @@ func addFileToDirectory(db db.DataBase, directoryId string, file File) error {
 	return nil
 }
 
-func folderExists(db db.DataBase, userId int64, currentDirectoryId string, directoryName string) (bool, error) {
+func folderExists(db db.DataBase, userId int64, currentDirectoryId int, directoryName string) (bool, error) {
 	currentDirectories, err := getNamesArray(db, currentDirectoryId, "directories")
 	if err != nil {
 		return false, err
@@ -103,8 +101,8 @@ func folderExists(db db.DataBase, userId int64, currentDirectoryId string, direc
 	return h.Contains(currentDirectories, directoryName), nil
 }
 
-func addNewDirectoryToDirectory(db db.DataBase, currentDirectoryId string, directory Directory) error {
-	req := fmt.Sprintf("update directories set directories = array_append(directories, %d) where id = %s", directory.Id, currentDirectoryId)
+func addNewDirectoryToDirectory(db db.DataBase, currentDirectoryId int, newDirectoryId int) error {
+	req := fmt.Sprintf("update directories set directories = array_append(directories, %d) where id = %d", newDirectoryId, currentDirectoryId)
 	
 	if err := db.MakeQuery(req); err != nil {
 		return err
@@ -112,8 +110,30 @@ func addNewDirectoryToDirectory(db db.DataBase, currentDirectoryId string, direc
 	return nil
 }
 
+func jumpToDirectory(db db.DataBase, userId int64, directoryId int) error {
+	req := fmt.Sprintf("update users set currentDirectory = %d where userId = %d", directoryId, userId)
+	
+	if err := db.MakeQuery(req); err != nil {
+		return err
+	}
+	return nil
+}
+
+func getParentDirectory(db db.DataBase, directoryId int) (Directory, error) {
+	currentDirectory, err := getDirectory(db, directoryId)
+	if err != nil{
+		return Directory{}, err
+	}
+	
+	if currentDirectory.ParentId == -1 {
+		return Directory{}, fmt.Errorf("this directory is root")
+	}
+
+	return getDirectory(db, currentDirectory.ParentId)
+}
+
 func createNewUser(db db.DataBase, user User) (string, error) {
-	exist, err := userExists(db, strconv.Itoa(user.UserId))
+	exist, err := userExists(db, int64(user.UserId))
 	if err != nil {
 		return "", err
 	}
@@ -130,8 +150,8 @@ func createNewUser(db db.DataBase, user User) (string, error) {
 	return id, err
 }
 
-func userExists(db db.DataBase, userId string) (bool, error) {
-	req := fmt.Sprintf("select id from users where userId = %s", userId)
+func userExists(db db.DataBase, userId int64) (bool, error) {
+	req := fmt.Sprintf("select id from users where userId = %d", userId)
 	id, err := db.SelectRow(req)
 	if err != nil {
 		return true, err
@@ -151,28 +171,28 @@ func getIdOfFileByUniqueId(db db.DataBase, fileUniqueId string) (int, error) {
 	return strconv.Atoi(id)
 }
 
-func getCurrentDirectory(db db.DataBase, userId string) (string, error) {
-	req := fmt.Sprintf("select currentDirectory from users where userId = %s", userId)
+func getCurrentDirectory(db db.DataBase, userId int64) (int, error) {
+	req := fmt.Sprintf("select currentDirectory from users where userId = %d", userId)
 	directoryId, err := db.SelectRow(req)
 	if err != nil {
-		return "", err
+		return -1, err
 	}
 	if directoryId == "" {
-		return "", errors.New("directory or user not found!")
+		return -1, errors.New("directory or user not found!")
 	}
-	return directoryId, nil
+	return strconv.Atoi(directoryId)
 }
 
 func getDirectory(db db.DataBase, id int) (Directory, error) {
 	d := Directory{}
-	req := fmt.Sprintf("select id, name, userId, size from directories where id = %d", id)
+	req := fmt.Sprintf("select id, parentId, name, userId, size from directories where id = %d", id)
 	rows, err := db.Select(req)
 	if err != nil {
 		return d, err
 	}
+	
 	rows.Next()
-	err = rows.Scan(&d.Id, &d.Name, &d.UserId, &d.Size)
-	if err != nil {
+	if err := rows.Scan(&d.Id, &d.ParentId, &d.Name, &d.UserId, &d.Size); err != nil {
 		return d, err
 	}
 	return d, nil
@@ -194,22 +214,27 @@ func getFileById(db db.DataBase, id int) (File, error) {
 	return f, nil
 }
 
-func getFileByName(db db.DataBase, name string) (File, error) {
+func getFileByName(db db.DataBase, name string) (File, error) { 
+	// This function works wrong 
+	// bcs it finds all files with requested name 
+	// including when user ain't host
+	// solution -> add into database column 'hosts' with type []int(better use id`s users)
 	f := File{}
 	req := fmt.Sprintf("select * from files where name = '%s'", name)
 	rows, err := db.Select(req)
 	if err != nil {
 		return f, err
 	}
+
 	rows.Next()
-	err = rows.Scan(&f.Id, &f.Name, &f.FileId, &f.FileUniqueId, &f.FileSize)
-	if err != nil {
+	
+	if err = rows.Scan(&f.Id, &f.Name, &f.FileId, &f.FileUniqueId, &f.FileSize); err != nil {
 		return f, err
 	}
 	return f, nil
 }
 
-func getAvailableDirectories(db db.DataBase, userId string) ([]Directory, error) {
+func getAvailableDirectories(db db.DataBase, userId int64) ([]Directory, error) {
 	var res []Directory
 
 	directoryId, err := getCurrentDirectory(db, userId)
@@ -230,7 +255,7 @@ func getAvailableDirectories(db db.DataBase, userId string) ([]Directory, error)
 	return res, nil
 }
 
-func getAvailableFiles(db db.DataBase, userId string) ([]File, error) {
+func getAvailableFiles(db db.DataBase, userId int64) ([]File, error) {
 	var res []File
 
 	directoryId, err := getCurrentDirectory(db, userId)
@@ -251,8 +276,8 @@ func getAvailableFiles(db db.DataBase, userId string) ([]File, error) {
 	return res, nil
 }
 
-func getIdsArray(db db.DataBase, directoryId string, name string) ([]int, error) {
-	req := fmt.Sprintf("select %s from directories where id = %s", name, directoryId)
+func getIdsArray(db db.DataBase, directoryId int, name string) ([]int, error) {
+	req := fmt.Sprintf("select %s from directories where id = %d", name, directoryId)
 	idsStr, err := db.SelectRow(req)
 	if err != nil {
 		return nil, err
@@ -264,8 +289,8 @@ func getIdsArray(db db.DataBase, directoryId string, name string) ([]int, error)
 	return ids, nil
 }
 
-func getNamesArray(db db.DataBase, directoryId string, name string) ([]string, error) {
-	req := fmt.Sprintf("select %s from directories where id = %s", name, directoryId)
+func getNamesArray(db db.DataBase, directoryId int, name string) ([]string, error) {
+	req := fmt.Sprintf("select %s from directories where id = %d", name, directoryId)
 	idsStr, err := db.SelectRow(req)
 	if err != nil {
 		return nil, err
@@ -331,7 +356,3 @@ func parseIds(jsonBuffer string) ([]int, error) {
 
     return ids, nil
 }
-
-
-// я могу получать файлы по айди даже если их нет в папке
-// нужно проверить на наличие в текущей папке
