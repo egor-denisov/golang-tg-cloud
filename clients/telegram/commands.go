@@ -3,6 +3,7 @@ package telegram
 import (
 	"fmt"
 	"main/lib/h"
+	. "main/types"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -32,24 +33,15 @@ func startCommand(cl *TgClient, msg *tgbotapi.Message) error {
 		LastName:  msg.From.LastName,
 	}
 
-	if _, err := createNewUser(cl.db, userInfo); err != nil {
+	if _, err := cl.db.CreateNewUser(userInfo); err != nil {
 		return err
 	}
-
-	if err := cl.sendMedia(msg.Chat.ID, content); err != nil {
-		return err
-	}
-	return nil
+	
+	return cl.sendMedia(msg.Chat.ID, content)
 }
 
 func helpCommand(cl *TgClient, msg *tgbotapi.Message) error {
-	var content Content
-	content.Text = "You can use /search for search file. Also you can see all files in current directory with /showAll."
-
-	if err := cl.sendMedia(msg.Chat.ID, content); err != nil {
-		return err
-	}
-	return nil
+	return cl.sendMedia(msg.Chat.ID, Content{Text: "You can use /search for search file. Also you can see all files in current directory with /showAll."})
 }
 
 func createFolderCommand(cl *TgClient, msg *tgbotapi.Message) error {
@@ -61,37 +53,26 @@ func createFolderCommand(cl *TgClient, msg *tgbotapi.Message) error {
 	}
 	directory.Name = "./" + directory.Name
 	
-	if _, err := createNewDirectory(cl.db, msg.From.ID, directory); err != nil {	
+	if _, err := cl.db.CreateNewDirectory(msg.From.ID, directory); err != nil {	
 		return err
 	}
 	
-	if err := cl.makeReplyAfterCreatingDirectory(msg.From.ID, directory.Name); err != nil {	
-		return err
-	}
-	return nil
+	return cl.makeReplyAfterCreatingDirectory(msg.From.ID, directory.Name)
 }
 
 func resetCommand(cl *TgClient, msg *tgbotapi.Message) error {
-	var content Content
-	content.Text = "You successfully reset data"
-	content.Keyboard = createEmptyKeyboard()
+	content := Content{
+		Text: "You successfully reset data",
+		Keyboard: createEmptyKeyboard(),
+	}
 
-	if err := resetUserData(cl.db, msg.From.ID); err != nil {
+	if err := cl.db.ResetUserData(msg.From.ID); err != nil {
 		return err
 	}
 
-	if err := cl.sendMedia(msg.Chat.ID, content); err != nil {
-		return err
-	}
-	return nil
+	return cl.sendMedia(msg.Chat.ID, content)
 }
 
 func unknownCommand(cl *TgClient, msg *tgbotapi.Message) error {
-	var content Content
-	content.Text = "I don't know this command"
-
-	if err := cl.sendMedia(msg.Chat.ID, content); err != nil {
-		return err
-	}
-	return nil
+	return cl.sendMedia(msg.Chat.ID, Content{Text: "I don't know this command"})
 }

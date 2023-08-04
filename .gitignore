@@ -20,5 +20,5 @@
 # Go workspace file
 go.work
 
-# config files
-config.go
+# evnironment file
+env.go

@@ -1,6 +1,7 @@
 package h
 
 import (
+	"encoding/json"
 	"strconv"
 	"strings"
 )
@@ -34,4 +35,16 @@ func IsValidName(name string) bool {
 		}
 	}
 	return true
+}
+
+func ParseIds(jsonBuffer string) ([]int, error) {
+	ids := []int{}
+	if len(jsonBuffer) == 0 {
+		return ids, nil
+	}
+	jsonBuffer = strings.Replace(jsonBuffer, "{", "[", -1)
+	jsonBuffer = strings.Replace(jsonBuffer, "}", "]", -1)
+
+    err := json.Unmarshal([]byte(jsonBuffer), &ids)
+    return ids, err
 }

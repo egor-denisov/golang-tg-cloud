@@ -1,16 +1,18 @@
 package telegram
 
 import (
+	. "main/types"
+
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 func (cl *TgClient) instantiateKeyboardNavigator(userID int64) (tgbotapi.ReplyKeyboardMarkup, error) {
-	files, err := getAvailableFiles(cl.db, userID)
+	files, err := cl.db.GetAvailableFiles(userID)
 	if err != nil {
 		return tgbotapi.ReplyKeyboardMarkup{}, err
 	}
 
-	directories, err := getAvailableDirectories(cl.db, userID)
+	directories, err := cl.db.GetAvailableDirectories(userID)
 	if err != nil {
 		return tgbotapi.ReplyKeyboardMarkup{}, err
 	}

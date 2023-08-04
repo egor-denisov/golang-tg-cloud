@@ -2,12 +2,10 @@ package main
 
 import (
 	"log"
-	"main/clients/telegram"
+	"main/clients/api"
 	"main/db"
 	"main/lib/e"
 )
-
-
 
 func main() {
     log.Printf("App was started")
@@ -16,7 +14,15 @@ func main() {
 		log.Fatal(e.Wrap("Cannot connect to database", err))
 	}
 	defer database.Close()
+	
+	stop := make(chan bool)
+	defer close(stop)
 
-	tgClient := telegram.New(TOKEN, database)
-	tgClient.Listen()
+	// tgClient := telegram.New(env.TOKEN, database)
+	// go tgClient.Listen()
+	
+	apiClient := api.New(database)
+	go apiClient.Listen()
+
+	<-stop
 }

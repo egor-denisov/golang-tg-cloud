@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	env "main/environment"
 	"main/lib/e"
 
 	_ "github.com/lib/pq"
@@ -17,7 +18,8 @@ func (db *DataBase) Get() *sql.DB{
 }
 
 func New() (DataBase, error) {
-	psqlconn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
+	psqlconn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", 
+		env.HOST, env.PORT, env.USER, env.PASSWORD, env.DBNAME)
 
 	db, err := sql.Open("postgres", psqlconn)
 	if err != nil {
@@ -31,7 +33,7 @@ func (db *DataBase) Close() {
 	db.database.Close()
 }
 
-func (db *DataBase) Insert(req string, args ...interface{}) (string, error) {
+func (db *DataBase) insert(req string, args ...interface{}) (string, error) {
 	id := ""
 	err := db.database.QueryRow(req, args...).Scan(&id)
 	if err != nil {
@@ -40,21 +42,17 @@ func (db *DataBase) Insert(req string, args ...interface{}) (string, error) {
 	return id, nil
 }
 
-func (db *DataBase) SelectRow(req string) (string, error) {
+func (db *DataBase) selectRow(req string) (string, error) {
 	res := ""
 	db.database.QueryRow(req).Scan(&res)
 	return res, nil
 }
 
-func (db *DataBase) Select(req string) (*sql.Rows, error) {
-	rows, err := db.database.Query(req)
-	if err != nil {
-		return nil, err
-	}
-	return rows, nil
+func (db *DataBase) selectRows(req string) (*sql.Rows, error) {
+	return db.database.Query(req)
 }
 
-func (db *DataBase) MakeQuery(req string) error {
+func (db *DataBase) makeQuery(req string) error {
 	_, err := db.database.Exec(req)
 	if err != nil {
 		return e.Wrap("can`t make query", err)

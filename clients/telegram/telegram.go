@@ -6,6 +6,7 @@ import (
 	"log"
 	"main/db"
 	"main/lib/e"
+	. "main/types"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -81,30 +82,23 @@ func (cl *TgClient) proccessFile(msg *tgbotapi.Message) error {
 			FileId: msg.Document.FileID,
 			FileUniqueId: msg.Document.FileUniqueID,
 			FileSize: msg.Document.FileSize,
+			
 		}
 	}
 
-	if _, err := createNewFile(cl.db, msg.From.ID, fileInfo); err != nil {	
+	if _, err := cl.db.CreateNewFile(msg.From.ID, fileInfo); err != nil {	
 		return err
 	}
-	
-	if err := cl.makeReplyAfterAdding(msg.From.ID, fileInfo.Name); err != nil{
-		return err
-	}
-	return nil
+
+	return cl.makeReplyAfterAdding(msg.From.ID, fileInfo.Name)
 }
 
 func (cl *TgClient) proccessText(msg *tgbotapi.Message) error{
 	if msg.Text[:2] == "./" || msg.Text[:3] == "../" {
-		if err := cl.makeReplyAfterRequestingDirectory(msg.From.ID, msg.Text); err != nil{
-			return err
-		}
-		return nil
+		return cl.makeReplyAfterRequestingDirectory(msg.From.ID, msg.Text)
 	}
-	if err := cl.makeReplyAfterRequestingFile(msg.From.ID, msg.Text); err != nil{
-		return err
-	}
-	return nil
+
+	return cl.makeReplyAfterRequestingFile(msg.From.ID, msg.Text)
 }
 
 func (cl *TgClient) makeReplyAfterAdding(userId int64, fileName string) (err error) {
@@ -117,10 +111,7 @@ func (cl *TgClient) makeReplyAfterAdding(userId int64, fileName string) (err err
 		Keyboard: keyboard,
 	}
 
-	if err := cl.sendMedia(userId, replyContent); err != nil{
-		return err
-	}
-	return nil
+	return cl.sendMedia(userId, replyContent)
 }
 
 func (cl *TgClient) makeReplyAfterRequestingFile(userId int64, reqString string) (err error) {
@@ -128,7 +119,7 @@ func (cl *TgClient) makeReplyAfterRequestingFile(userId int64, reqString string)
 
 	var file File
 
-	availableFiles, err := getAvailableFiles(cl.db, userId)
+	availableFiles, err := cl.db.GetAvailableFiles(userId)
 	for _, f := range availableFiles {
 		if f.Name == reqString {
 			file = f
@@ -159,10 +150,7 @@ func (cl *TgClient) makeReplyAfterRequestingFile(userId int64, reqString string)
 		content = Content{Document: &document}
 	}
 
-	if err := cl.sendMedia(userId, content); err != nil{
-		return err
-	}
-	return nil
+	return cl.sendMedia(userId, content)
 }
 
 func (cl *TgClient) makeReplyAfterRequestingDirectory(userId int64, reqString string) (err error) {
@@ -171,18 +159,18 @@ func (cl *TgClient) makeReplyAfterRequestingDirectory(userId int64, reqString st
 	var directory Directory
 
 	if reqString == "../" {
-		currentDirectoryId, err := getCurrentDirectory(cl.db, userId)
+		currentDirectoryId, err := cl.db.GetCurrentDirectory(userId)
 		if err != nil {
 			return err
 		}
 
-		directory, err = getParentDirectory(cl.db, currentDirectoryId)
+		directory, err = cl.db.GetParentDirectory(currentDirectoryId)
 		if err != nil {
 			return err
 		}
 		
 	}else{
-		availableDirectory, err := getAvailableDirectories(cl.db, userId)
+		availableDirectory, err := cl.db.GetAvailableDirectories(userId)
 		if err != nil {
 			return err
 		}
@@ -198,7 +186,7 @@ func (cl *TgClient) makeReplyAfterRequestingDirectory(userId int64, reqString st
 		}
 	}
 
-	if err := jumpToDirectory(cl.db, userId, directory.Id); err != nil {
+	if err := cl.db.JumpToDirectory(userId, directory.Id); err != nil {
 		return err
 	}
 
@@ -212,11 +200,7 @@ func (cl *TgClient) makeReplyAfterRequestingDirectory(userId int64, reqString st
 		Keyboard: keyboard,
 	}
 
-	if err := cl.sendMedia(userId, content); err != nil{
-		return err
-	}
-
-	return nil
+	return cl.sendMedia(userId, content)
 }
 
 func (cl *TgClient) makeReplyAfterCreatingDirectory(userId int64, directoryName string) (err error) {
@@ -228,10 +212,7 @@ func (cl *TgClient) makeReplyAfterCreatingDirectory(userId int64, directoryName 
 		Keyboard: keyboard,
 	}
 
-	if err := cl.sendMedia(userId, replyContent); err != nil{
-		return err
-	}
-	return nil
+	return cl.sendMedia(userId, replyContent)
 }
 
 func (cl *TgClient) sendMedia(chatID int64, content Content) (err error) {
