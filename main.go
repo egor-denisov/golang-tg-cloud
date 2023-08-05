@@ -4,7 +4,9 @@ import (
 	"log"
 	"main/clients/api"
 	"main/db"
+	env "main/environment"
 	"main/lib/e"
+	"main/storage"
 )
 
 func main() {
@@ -18,10 +20,12 @@ func main() {
 	stop := make(chan bool)
 	defer close(stop)
 
-	// tgClient := telegram.New(env.TOKEN, database)
+	// tgClient := telegram.New(env.BOT_TOKEN, database)
 	// go tgClient.Listen()
 	
-	apiClient := api.New(database)
+	storage := storage.New(env.STORAGE_TOKEN, database)
+
+	apiClient := api.New(database, storage)
 	go apiClient.Listen()
 
 	<-stop

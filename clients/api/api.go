@@ -1,7 +1,9 @@
 package api
 
 import (
+	"log"
 	"main/db"
+	"main/storage"
 	"net/http"
 	"strconv"
 	"strings"
@@ -12,12 +14,14 @@ import (
 type ApiClient struct {
 	router *gin.Engine
 	db db.DataBase
+	storage storage.Storage
 }
 
-func New(db db.DataBase) ApiClient {
+func New(db db.DataBase, s storage.Storage) ApiClient {
 	res := ApiClient{
 		router:  gin.Default(),
 		db:      db,
+		storage: s,
 	}
 	res.router.GET("/directory", res.getDirecoryById)
 	res.router.GET("/file", res.getFileById)
@@ -59,10 +63,18 @@ func (api *ApiClient) getFileById(context *gin.Context) {
 		return
 	}
 
-	context.IndentedJSON(http.StatusOK, file)
+	//context.IndentedJSON(http.StatusOK, file)
+
+	url, err := api.storage.GetFile(file.FileId)
+	if err != nil {
+		ProccessError(context, err)
+		return 
+	}
+	context.File(url)
 }
 
 func ProccessError(context *gin.Context, err error) {
+	log.Print(err)
 	switch strings.Split(err.Error(), ":")[0] {
 	case "sql":
 		context.IndentedJSON(http.StatusNotFound, "Not found")
