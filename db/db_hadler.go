@@ -127,9 +127,9 @@ func (db *DataBase) CreateNewUser(user User) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
-	return db.insert("insert into users (Username, UserID, FirstName, LastName, CurrentDirectory) values ($1, $2, $3, $4, $5) returning Id", 
-		user.UserName, user.UserId, user.FirstName, user.LastName, directoryId)
+	
+	return db.insert("insert into users (Username, ChatID, UserID, FirstName, LastName, CurrentDirectory) values ($1, $2, $3, $4, $5, $6) returning Id", 
+		user.UserName, user.ChatId, user.UserId, user.FirstName, user.LastName, directoryId)
 }
 
 func (db *DataBase) UserExists(userId int64) (bool, error) {

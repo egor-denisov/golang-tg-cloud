@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"strconv"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 const bannedSymbols = "<>:«/\\|?*"
@@ -47,4 +49,9 @@ func ParseIds(jsonBuffer string) ([]int, error) {
 
     err := json.Unmarshal([]byte(jsonBuffer), &ids)
     return ids, err
+}
+
+func GenerateUniqueName() string {
+	name := uuid.New()
+	return name.String()
 }

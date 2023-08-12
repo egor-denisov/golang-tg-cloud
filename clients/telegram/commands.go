@@ -27,6 +27,7 @@ func startCommand(cl *TgClient, msg *tgbotapi.Message) error {
 	var content Content
 	content.Text = "Hello! Send me a file or create a new folder"
 	userInfo := User{
+		ChatId:    int(msg.Chat.ID),
 		UserId:    int(msg.From.ID),
 		UserName:  msg.From.UserName,
 		FirstName: msg.From.FirstName,

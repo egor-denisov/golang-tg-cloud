@@ -71,7 +71,7 @@ func (cl *TgClient) proccessFile(msg *tgbotapi.Message) error {
 	var fileInfo File
 	if msg.Photo != nil {
 		fileInfo = File{
-			Name: "photo" + msg.Photo[0].FileUniqueID,
+			Name: "photo" + msg.Photo[0].FileUniqueID + ".jpg",
 			FileId: msg.Photo[0].FileID,
 			FileUniqueId: msg.Photo[0].FileUniqueID,
 			FileSize: msg.Photo[0].FileSize,
