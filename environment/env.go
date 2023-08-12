@@ -10,5 +10,5 @@ const (
 )
 
 // Telegram tokens
-const BOT_TOKEN = "5837544572:AAHEKX1XvXphaee-TfJpV60hgHAtngQW-EE"
-const STORAGE_TOKEN = "5837544572:AAHEKX1XvXphaee-TfJpV60hgHAtngQW-EE"
+const BOT_TOKEN = "58....E"
+const STORAGE_TOKEN = "34....F"
