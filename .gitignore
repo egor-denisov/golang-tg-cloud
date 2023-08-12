@@ -21,7 +21,7 @@
 go.work
 
 # evnironment file
-# env.go
+env.go
 
 # assets directory
 /assets
