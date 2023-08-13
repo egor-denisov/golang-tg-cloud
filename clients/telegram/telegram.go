@@ -105,6 +105,9 @@ func (cl *TgClient) makeReplyAfterAdding(userId int64, fileName string) (err err
 	defer func() { err = e.WrapIfErr("can`t make reply after adding", err) }()
 
 	keyboard, err := cl.instantiateKeyboardNavigator(userId)
+	if err != nil {
+		return err
+	}
 
 	replyContent := Content{
 		Text: fmt.Sprintf("File %s successfully added", fileName),
@@ -207,6 +210,10 @@ func (cl *TgClient) makeReplyAfterCreatingDirectory(userId int64, directoryName 
 	defer func() { err = e.WrapIfErr("can`t make reply after creating directory", err) }()
 	
 	keyboard, err := cl.instantiateKeyboardNavigator(userId)
+	if err != nil {
+		return err
+	}
+	
 	replyContent := Content{
 		Text: fmt.Sprintf("Directory %s created successfully", directoryName),
 		Keyboard: keyboard,

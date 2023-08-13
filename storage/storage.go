@@ -16,6 +16,7 @@ type UploadingItem struct {
 	path     string
 	filename string
 	user     User
+	directoryId int
 }
 
 type Storage struct {
@@ -31,7 +32,7 @@ func New(token string, db db.DataBase) Storage {
 	if err != nil {
 		log.Panic(err)
 	}
-
+	// Enabling debugging input
 	bot.Debug = true
 	log.Printf("Storage activated on account %s", bot.Self.UserName)
 	// Return instance of storage
@@ -82,10 +83,28 @@ func (s *Storage) UploadFile(item UploadingItem) (err error) {
 	}
 
 	// Create new instance of document and sending it to user
-	msg := tgbotapi.NewDocument(int64(item.user.ChatId), tgbotapi.FilePath(newPath))
-	if _, err = s.bot.Send(msg); err != nil {
+	document := tgbotapi.NewDocument(int64(item.user.ChatId), tgbotapi.FilePath(newPath))
+	msg, err := s.bot.Send(document)
+	if err != nil {
 		return err
 	}
+	// Create new instance of file
+	file := File{
+		Name: msg.Document.FileName,
+		FileId: msg.Document.FileID,
+		FileUniqueId: msg.Document.FileUniqueID,
+		FileSize: msg.Document.FileSize,
+	}
+	// Upload file to database
+	file.Id, err = s.db.CreateNewFile(int64(item.user.UserId), file)
+	if err != nil {
+		return err
+	}
+	// Adding uploaded file to directory
+	if err := s.db.AddFileToDirectory(item.directoryId, file); err != nil {
+		return err
+	}
+
 	// Remove temp file
 	if err := os.Remove(newPath); err != nil {
 		return err
@@ -95,11 +114,12 @@ func (s *Storage) UploadFile(item UploadingItem) (err error) {
 }
 
 // Function for adding new item to queue channel
-func (s *Storage) AddToUploadingQueue(path string, filename string, user User) {
+func (s *Storage) AddToUploadingQueue(path string, filename string, user User, directoryId int) {
 	// Adding new item to queue channel
 	s.uploadingQueue <- UploadingItem{
 		path: path, 
 		filename: filename, 
 		user: user,
+		directoryId: directoryId,
 	}
 }

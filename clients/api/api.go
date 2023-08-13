@@ -25,17 +25,20 @@ type ApiClient struct {
 
 // Function for creating a new ApiClient instance
 func New(db db.DataBase, s storage.Storage) ApiClient {
+	// Creating a new router and set max limit of memory for it
 	router := gin.Default()
 	router.MaxMultipartMemory = 8 * 20
-	
+	// Creating a new instance of the ApiClient
 	res := ApiClient{
 		router:  router,
 		db:      db,
 		storage: s,
 	}
+	// Setting route for the router
 	res.router.GET("/directory", res.getDirecoryById)
 	res.router.GET("/file", res.getFileById)
 	res.router.POST("/upload", res.uploadFile)
+
 	return res
 }
 
@@ -43,44 +46,45 @@ func New(db db.DataBase, s storage.Storage) ApiClient {
 func (api *ApiClient) Listen() {
 	api.router.Run()
 }
-
+// Function returns a directory info by id
 func (api *ApiClient) getDirecoryById(context *gin.Context) {
-	
+	// Getting the directory id from request parameters and convert it to a number
 	id, err := strconv.Atoi(context.Query("id"))
 	if err != nil {
 		ProccessError(context, err)
 		return
 	}
-	
+	// Getting data about the directory by id
 	d, err := api.db.GetDirectory(id)
 	if err != nil {
 		ProccessError(context, err)
 		return
 	}
-
+	// Return the directory data object
 	context.IndentedJSON(http.StatusOK, d)
 }
 
+// Function returns a file by id
 func (api *ApiClient) getFileById(context *gin.Context) {
-	
+	// Getting the directory id from request parameters and convert it to a number
 	id, err := strconv.Atoi(context.Query("id"))
 	if err != nil {
 		ProccessError(context, err)
 		return
 	}
-	
+	// Getting data about the file by id
 	fileData, err := api.db.GetFileById(id)
 	if err != nil {
 		ProccessError(context, err)
 		return
 	}
-
+	// Getting file as bytes from storage
 	fileBytes, err := api.storage.GetFileAsBytes(fileData.FileId)
 	if err != nil {
 		ProccessError(context, err)
 		return 
 	}
-	
+	// Setting headers and provide file for downloading
 	context.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", fileData.Name))
 	http.ServeContent(context.Writer, context.Request, "filename", time.Now(), bytes.NewReader(fileBytes))
 }
@@ -105,10 +109,17 @@ func (api *ApiClient) uploadFile(context *gin.Context) {
 		ProccessError(context, err)
 		return
 	}
+	// Getting directory id
+	directoryId, err := strconv.Atoi(context.PostForm("directory"))
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
 	// Adding our data in queue for later adding to telegram server
-	api.storage.AddToUploadingQueue(path, headers.Filename, user)
+	api.storage.AddToUploadingQueue(path, headers.Filename, user, directoryId)
 }
 
+// Function for proccessing errors in working of api
 func ProccessError(context *gin.Context, err error) {
 	log.Print(err)
 	switch strings.Split(err.Error(), ":")[0] {

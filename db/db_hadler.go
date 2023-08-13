@@ -43,40 +43,40 @@ func (db *DataBase) CreateNewDirectory(userId int64, directory Directory) (strin
 	return id, db.AddNewDirectoryToDirectory(currentDirectoryId, newDirectoryId)
 }
 
-func (db *DataBase) CreateNewFile(userId int64, file File) (string, error) {
+func (db *DataBase) CreateNewFile(userId int64, file File) (int, error) {
 	directoryId, err := db.GetCurrentDirectory(userId)
 	if err != nil {
-		return "", err
+		return -1, err
 	}
 
 	id, err := db.GetIdOfFileByUniqueId(file.FileUniqueId)
 	if err != nil {
-		return "", err
+		return -1, err
 	}
 
 	if id > 0 {
 		file.Id = id
 		currentFiles, err := db.GetIdsArray(directoryId, "files")
 		if err != nil {
-			return "", err
+			return -1, err
 		}
 
 		if h.Contains(currentFiles, file.Id) {
-			return "", fmt.Errorf("file already exists in folder")
+			return -1, fmt.Errorf("file already exists in folder")
 		}
 	}else{
 		idStr, err := db.insert("insert into files (Name, FileId, FileUniqueId, FileSize) values ($1, $2, $3, $4) returning Id", 
 			file.Name, file.FileId, file.FileUniqueId, file.FileSize)
 		if err != nil {
-			return "", err
+			return -1, err
 		}
 		file.Id, err = strconv.Atoi(idStr)
 		if err != nil {
-			return "", err
+			return -1, err
 		}
 	}
 
-	return strconv.Itoa(file.Id), db.AddFileToDirectory(directoryId, file)
+	return file.Id, db.AddFileToDirectory(directoryId, file)
 }
 
 func (db *DataBase) AddFileToDirectory(directoryId int, file File) error {
@@ -219,12 +219,12 @@ func (db *DataBase) GetAvailableFiles(userId int64) ([]File, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	
 	arr, err := db.GetIdsArray(directoryId, "files")
 	if err != nil {
 		return nil, err
 	}
-
+	
 	for _, id := range arr {
 		d, err := db.GetFileById(id)
 		if err != nil {

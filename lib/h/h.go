@@ -8,8 +8,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const bannedSymbols = "<>:«/\\|?*"
-
+// Function for checking availability of element in an array
 func Contains[T comparable](s []T, e T) bool {
 	for _, v := range s {
 		if v == e {
@@ -18,7 +17,7 @@ func Contains[T comparable](s []T, e T) bool {
 	}
 	return false
 }
-
+// Function which converts an array with integers into array with string elements
 func IntArrayToStrArray(arr []int) []string {
 	var res []string
 	for _, el := range arr {
@@ -26,11 +25,14 @@ func IntArrayToStrArray(arr []int) []string {
 	}
 	return res
 }
-
+// Function which checks validation of name for file or directory
 func IsValidName(name string) bool {
+	const bannedSymbols = "<>:«/\\|?*"
+	// Name cannot be empty or longer than 50
 	if name == "" || len(name) > 50 {
 		return false
 	}
+	// Name cannot include a banned symbols
 	for _, char := range bannedSymbols {
 		if strings.Contains(name, string(char)) {
 			return false
@@ -38,20 +40,21 @@ func IsValidName(name string) bool {
 	}
 	return true
 }
-
+// Function which parse string and convert its array of integers
 func ParseIds(jsonBuffer string) ([]int, error) {
 	ids := []int{}
+	// Returning an empty array if string is empty
 	if len(jsonBuffer) == 0 {
 		return ids, nil
 	}
+	// Replacing curly braces to square 
 	jsonBuffer = strings.Replace(jsonBuffer, "{", "[", -1)
 	jsonBuffer = strings.Replace(jsonBuffer, "}", "]", -1)
-
+	// Parsing JSON string
     err := json.Unmarshal([]byte(jsonBuffer), &ids)
     return ids, err
 }
-
+// Function which returns unique name (uuid) for something
 func GenerateUniqueName() string {
-	name := uuid.New()
-	return name.String()
+	return uuid.New().String()
 }
