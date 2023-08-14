@@ -32,7 +32,7 @@ func New(token string, db db.DataBase) Storage {
 	if err != nil {
 		log.Panic(err)
 	}
-	// Enabling debugging input
+	// Enabling debugging output
 	bot.Debug = true
 	log.Printf("Storage activated on account %s", bot.Self.UserName)
 	// Return instance of storage

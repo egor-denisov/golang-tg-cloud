@@ -16,33 +16,34 @@ type TgClient struct {
 	updates tgbotapi.UpdatesChannel
 	db 		db.DataBase
 }
-
+// Function for creating a new TgClient instance
 func New(token string, db db.DataBase) TgClient {
+	// Create a new tg bot instance
 	bot, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
 		log.Panic(err)
 	}
-
+	// Enabling debugging output
 	bot.Debug = true
 	log.Printf("Authorized on account %s", bot.Self.UserName)
-
+	// Setting updating parameters
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 	updates := bot.GetUpdatesChan(u)
-
+	// Return instance of telegram client
 	return TgClient{
 		bot: bot,
 		updates: updates,
 		db: db,
 	}
 }
-
+// Function which listens for updates
 func (cl *TgClient) Listen() {
 	for update := range cl.updates {
 		if update.Message == nil {
 			continue
 		}
-		
+		// Processing new message and creating answer if error occurs
 		if err := cl.proccessMessage(update.Message); err != nil {
 			answer := Content{Text: proccessError(err)}
 			cl.sendMedia(update.Message.Chat.ID, answer)
@@ -52,10 +53,10 @@ func (cl *TgClient) Listen() {
 		log.Print("Message received")
 	}
 }
-
+// Function for proccessing message and defining type of message
 func (cl *TgClient) proccessMessage(msg *tgbotapi.Message) (err error) {
 	defer func() { err = e.WrapIfErr("can`t proccess message", err) }()
-
+	// Defining type of message
 	if msg.IsCommand() {
 		return cl.proccessCommand(msg)
 	}else if msg.Photo != nil || msg.Document != nil {
@@ -63,12 +64,13 @@ func (cl *TgClient) proccessMessage(msg *tgbotapi.Message) (err error) {
 	}else if msg.Text != ""{
 		return cl.proccessText(msg)
 	}
-
+	// If unknown type return error
 	return errors.New("Unknown type of message")
 }
-
+// Function for processing message including file
 func (cl *TgClient) proccessFile(msg *tgbotapi.Message) error {
 	var fileInfo File
+	// Setting information about the file
 	if msg.Photo != nil {
 		fileInfo = File{
 			Name: "photo" + msg.Photo[0].FileUniqueID + ".jpg",
@@ -85,55 +87,57 @@ func (cl *TgClient) proccessFile(msg *tgbotapi.Message) error {
 			
 		}
 	}
-
+	// Creating a new file in the database
 	if _, err := cl.db.CreateNewFile(msg.From.ID, fileInfo); err != nil {	
 		return err
 	}
-
+	// Making reply to the user
 	return cl.makeReplyAfterAdding(msg.From.ID, fileInfo.Name)
 }
-
+// Function for processing message including text
 func (cl *TgClient) proccessText(msg *tgbotapi.Message) error{
+	// If the path starts with './' or equals '../' then we request a directory
 	if msg.Text[:2] == "./" || msg.Text[:3] == "../" {
 		return cl.makeReplyAfterRequestingDirectory(msg.From.ID, msg.Text)
 	}
-
+	// Else requesting a file
 	return cl.makeReplyAfterRequestingFile(msg.From.ID, msg.Text)
 }
-
+// Function for creating respond after adding a new file
 func (cl *TgClient) makeReplyAfterAdding(userId int64, fileName string) (err error) {
 	defer func() { err = e.WrapIfErr("can`t make reply after adding", err) }()
-
+	// Creating new keyboard with updated data
 	keyboard, err := cl.instantiateKeyboardNavigator(userId)
 	if err != nil {
 		return err
 	}
-
+	// Creating content for replying
 	replyContent := Content{
 		Text: fmt.Sprintf("File %s successfully added", fileName),
 		Keyboard: keyboard,
 	}
-
+	// Sending replying message
 	return cl.sendMedia(userId, replyContent)
 }
-
+// Function for creating respond after requesting a file
 func (cl *TgClient) makeReplyAfterRequestingFile(userId int64, reqString string) (err error) {
 	defer func() { err = e.WrapIfErr("can`t make reply after requesting file", err) }()
 
 	var file File
-
+	// Getting available files from the database
 	availableFiles, err := cl.db.GetAvailableFiles(userId)
+	// Iterating through available files and finding matching name
 	for _, f := range availableFiles {
 		if f.Name == reqString {
 			file = f
 			break
 		}
 	}
-
+	// Checking result
 	if file.Name != reqString {
 		return fmt.Errorf("file is not available from this folder")
 	}
-
+	// Creating content for replying
 	var content Content
 	if file.Name[:5] == "photo" {
 		var photo []tgbotapi.PhotoSize
@@ -152,76 +156,78 @@ func (cl *TgClient) makeReplyAfterRequestingFile(userId int64, reqString string)
 		}
 		content = Content{Document: &document}
 	}
-
+	// Sending replying message
 	return cl.sendMedia(userId, content)
 }
-
+// Function for creating respond after requesting a directory
 func (cl *TgClient) makeReplyAfterRequestingDirectory(userId int64, reqString string) (err error) {
 	defer func() { err = e.WrapIfErr("can`t make reply after requesting directory", err) }()
 	
 	var directory Directory
-
+	// If it`s a 'go back' then go back to the parent directory
 	if reqString == "../" {
+		// Getting current directory id
 		currentDirectoryId, err := cl.db.GetCurrentDirectory(userId)
 		if err != nil {
 			return err
 		}
-
+		// And getting parent directory for the current
 		directory, err = cl.db.GetParentDirectory(currentDirectoryId)
 		if err != nil {
 			return err
 		}
-		
 	}else{
+		// Getting available directories
 		availableDirectory, err := cl.db.GetAvailableDirectories(userId)
 		if err != nil {
 			return err
 		}
+		// Iterating through available directories and finding matching name
 		for _, d := range availableDirectory {
 			if d.Name == reqString {
 				directory = d
 				break
 			}
 		}
-
+		// Checking result
 		if directory.Name != reqString {
 			return fmt.Errorf("directory is not available from this folder")
 		}
 	}
-
+	// Moving to the found directory
 	if err := cl.db.JumpToDirectory(userId, directory.Id); err != nil {
 		return err
 	}
-
+	// Creating new keyboard with updated data
 	keyboard, err := cl.instantiateKeyboardNavigator(userId)
 	if err != nil {
 		return err
 	}
-
+	// Creating content for replying
 	content := Content{
 		Text: fmt.Sprintf("Now you in '%s' folder", directory.Name),
 		Keyboard: keyboard,
 	}
-
+	// Sending replying message
 	return cl.sendMedia(userId, content)
 }
-
+// Function for creating respond after creating a new directory
 func (cl *TgClient) makeReplyAfterCreatingDirectory(userId int64, directoryName string) (err error) {
 	defer func() { err = e.WrapIfErr("can`t make reply after creating directory", err) }()
-	
+	// Creating new keyboard with updated data
 	keyboard, err := cl.instantiateKeyboardNavigator(userId)
 	if err != nil {
 		return err
 	}
-	
+	// Creating content for replying
 	replyContent := Content{
 		Text: fmt.Sprintf("Directory %s created successfully", directoryName),
 		Keyboard: keyboard,
 	}
-
+	// Sending replying message
 	return cl.sendMedia(userId, replyContent)
 }
-
+// Function for sending message to user
 func (cl *TgClient) sendMedia(chatID int64, content Content) (err error) {
 	defer func() { err = e.WrapIfErr("can`t send media", err) }()
 
@@ -235,20 +241,17 @@ func (cl *TgClient) sendMedia(chatID int64, content Content) (err error) {
 		if content.Keyboard != nil{
 			msg.ReplyMarkup = content.Keyboard
 		}
-		if _, err := cl.bot.Send(msg); err != nil {
-			return err
-		}
-		return nil
+		// Sending the message
+		_, err = cl.bot.Send(msg)
+		return err
 	}else {
 		return errors.New("can`t find required type of message")
 	}
-
-	if _, err := cl.bot.Send(msg); err != nil {
-		return err
-	}
-	return nil
+	// Sending the message
+	_, err = cl.bot.Send(msg)
+	return err
 }
-
+// Function for error handling
 func proccessError(err error) string {
 	switch err.Error() {
 		case "can`t proccess message: directory or user not found!": 
