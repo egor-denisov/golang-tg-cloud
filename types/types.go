@@ -35,3 +35,8 @@ type File struct {
 	FileUniqueId string `json:"file_unique_id"`
 	FileSize int `json:"file_size"`
 }
+
+type DirectoryContent struct {
+	Directories []Directory `json:"directories"`
+	Files []File `json:"files"`
+}

@@ -202,15 +202,11 @@ func (db *DataBase) GetFileById(id int) (File, error) {
 	err = rows.Scan(&f.Id, &f.Name, &f.FileId, &f.FileUniqueId, &f.FileSize)
 	return f, err
 }
-// Function for getting available directories in current directory
-func (db *DataBase) GetAvailableDirectories(userId int64) ([]Directory, error) {
+// Function for getting available directories in directory
+func (db *DataBase) GetAvailableDirectoriesInDiretory(userId int64, directoryId int) ([]Directory, error) {
 	var res []Directory
-	// Getting current directory
-	directoryId, err := db.GetCurrentDirectory(userId)
-	if err != nil {
-		return nil, err
-	}
-	// Getting an array of directory ids contained in the current directory
+
+	// Getting an array of directory ids contained in the directory
 	arr, err := db.GetIdsArray(directoryId, "directories")
 	if err != nil {
 		return nil, err
@@ -226,15 +222,11 @@ func (db *DataBase) GetAvailableDirectories(userId int64) ([]Directory, error) {
 	// Returning result array
 	return res, nil
 }
-// Function for getting available files in current directory
-func (db *DataBase) GetAvailableFiles(userId int64) ([]File, error) {
+// Function for getting available files in directory
+func (db *DataBase) GetAvailableFilesInDiretory(userId int64, directoryId int) ([]File, error) {
 	var res []File
-	// Getting current directory
-	directoryId, err := db.GetCurrentDirectory(userId)
-	if err != nil {
-		return nil, err
-	}
-	// Getting an array of files ids contained in the current directory
+	
+	// Getting an array of files ids contained in the directory
 	arr, err := db.GetIdsArray(directoryId, "files")
 	if err != nil {
 		return nil, err
@@ -249,6 +241,21 @@ func (db *DataBase) GetAvailableFiles(userId int64) ([]File, error) {
 	}
 	// Returning result array
 	return res, nil
+}
+// Function for getting available items in directory
+func (db *DataBase) GetAvailableItemsInDirectory (userId int64, directoryId int) (DirectoryContent, error) {
+	// Getting available directories
+	directories, err := db.GetAvailableDirectoriesInDiretory(userId, directoryId)
+	if err != nil {
+		return DirectoryContent{}, err
+	}
+	// Getting available files
+	files, err := db.GetAvailableFilesInDiretory(userId, directoryId)
+	// Returning result
+	return DirectoryContent{
+		Directories: directories,
+		Files: files,
+	}, nil
 }
 // Function for getting array of id`s ("file"/"directory" - parameter 'name') from directory
 func (db *DataBase) GetIdsArray(directoryId int, name string) ([]int, error) {

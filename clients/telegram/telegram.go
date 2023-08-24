@@ -124,8 +124,13 @@ func (cl *TgClient) makeReplyAfterRequestingFile(userId int64, reqString string)
 	defer func() { err = e.WrapIfErr("can`t make reply after requesting file", err) }()
 
 	var file File
+	// Getting current directory
+	directoryId, err := cl.db.GetCurrentDirectory(userId)
+	if err != nil {
+		return err
+	}
 	// Getting available files from the database
-	availableFiles, err := cl.db.GetAvailableFiles(userId)
+	availableFiles, err := cl.db.GetAvailableFilesInDiretory(userId, directoryId)
 	// Iterating through available files and finding matching name
 	for _, f := range availableFiles {
 		if f.Name == reqString {
@@ -177,8 +182,13 @@ func (cl *TgClient) makeReplyAfterRequestingDirectory(userId int64, reqString st
 			return err
 		}
 	}else{
+		// Getting current directory
+		directoryId, err := cl.db.GetCurrentDirectory(userId)
+		if err != nil {
+			return err
+		}
 		// Getting available directories
-		availableDirectory, err := cl.db.GetAvailableDirectories(userId)
+		availableDirectory, err := cl.db.GetAvailableDirectoriesInDiretory(userId, directoryId)
 		if err != nil {
 			return err
 		}

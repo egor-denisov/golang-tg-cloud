@@ -7,19 +7,19 @@ import (
 )
 
 // Creating a new bot keyboard for the current user
-func (cl *TgClient) instantiateKeyboardNavigator(userID int64) (tgbotapi.ReplyKeyboardMarkup, error) {
-	// Getting available files from the database
-	files, err := cl.db.GetAvailableFiles(userID)
+func (cl *TgClient) instantiateKeyboardNavigator(userId int64) (tgbotapi.ReplyKeyboardMarkup, error) {
+	// Getting current directory
+	directoryId, err := cl.db.GetCurrentDirectory(userId)
 	if err != nil {
 		return tgbotapi.ReplyKeyboardMarkup{}, err
 	}
-	// Getting available directories from the database
-	directories, err := cl.db.GetAvailableDirectories(userID)
+	// Getting available items from the database
+	items, err := cl.db.GetAvailableItemsInDirectory(userId, directoryId)
 	if err != nil {
 		return tgbotapi.ReplyKeyboardMarkup{}, err
 	}
 	// Return keyboard instance
-	return createKeyboardNavigator(directories, files), nil
+	return createKeyboardNavigator(items.Directories, items.Files), nil
 }
 // Creating an empty instance of keyboard
 func createEmptyKeyboard() tgbotapi.ReplyKeyboardRemove {

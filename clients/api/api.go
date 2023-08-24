@@ -38,6 +38,7 @@ func New(db db.DataBase, s storage.Storage) ApiClient {
 	res.router.GET("/directory", res.getDirecoryById)
 	res.router.GET("/file", res.getFileById)
 	res.router.POST("/upload", res.uploadFile)
+	res.router.GET("/available", res.getAvailableItems)
 
 	return res
 }
@@ -89,6 +90,7 @@ func (api *ApiClient) getFileById(context *gin.Context) {
 	http.ServeContent(context.Writer, context.Request, "filename", time.Now(), bytes.NewReader(fileBytes))
 }
 
+// Function for uploading new files 
 func (api *ApiClient) uploadFile(context *gin.Context) {
 	// Getting uploaded file
 	_, headers, err := context.Request.FormFile("file")
@@ -104,7 +106,7 @@ func (api *ApiClient) uploadFile(context *gin.Context) {
 	}
 	// Getting user data
 	var user User
-	userData := context.PostForm("user-data")
+	userData := context.PostForm("user_data")
 	if err := json.Unmarshal([]byte(userData), &user); err != nil {
 		ProccessError(context, err)
 		return
@@ -119,6 +121,29 @@ func (api *ApiClient) uploadFile(context *gin.Context) {
 	api.storage.AddToUploadingQueue(path, headers.Filename, user, directoryId)
 }
 
+// Function for getting available files and directories
+func (api *ApiClient) getAvailableItems(context *gin.Context) {
+	// Getting the user id from request parameters and convert it to a number
+	userId, err := strconv.Atoi(context.Query("user_id"))
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	// Getting the directory id from request parameters and convert it to a number
+	directoryId, err := strconv.Atoi(context.Query("directory_id"))
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	// Getting data about the directory by id
+	items, err := api.db.GetAvailableItemsInDirectory(int64(userId), directoryId)
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	// Return the directory data object
+	context.IndentedJSON(http.StatusOK, items)
+}
 // Function for proccessing errors in working of api
 func ProccessError(context *gin.Context, err error) {
 	log.Print(err)
