@@ -3,6 +3,7 @@ package db
 import (
 	"errors"
 	"fmt"
+	"log"
 	"main/lib/h"
 	. "main/types"
 	"strconv"
@@ -46,12 +47,7 @@ func (db *DataBase) CreateNewDirectory(userId int64, directory Directory) (strin
 	return id, db.AddNewDirectoryToDirectory(currentDirectoryId, newDirectoryId)
 }
 // Function for creating a new file
-func (db *DataBase) CreateNewFile(userId int64, file File) (int, error) {
-	// Getting current directory
-	directoryId, err := db.GetCurrentDirectory(userId)
-	if err != nil {
-		return -1, err
-	}
+func (db *DataBase) CreateNewFile(userId int64, directoryId int, file File) (int, error) {
 	// Getting id by unique id
 	id, err := db.GetIdOfFileByUniqueId(file.FileUniqueId)
 	if err != nil {
@@ -71,8 +67,9 @@ func (db *DataBase) CreateNewFile(userId int64, file File) (int, error) {
 		}
 	}else{
 		// Inserting file into database
-		idStr, err := db.insert("insert into files (Name, FileId, FileUniqueId, FileSize) values ($1, $2, $3, $4) returning Id", 
-			file.Name, file.FileId, file.FileUniqueId, file.FileSize)
+		idStr, err := db.insert("insert into files (Name, FileId, FileUniqueId, FileSize, ThumbnailFileId) values ($1, $2, $3, $4, $5, $6) returning Id", 
+				file.Name, file.FileId, file.FileUniqueId, file.FileSize, file.ThumbnailFileId)
+		
 		if err != nil {
 			return -1, err
 		}
@@ -199,7 +196,7 @@ func (db *DataBase) GetFileById(id int) (File, error) {
 	}
 	rows.Next()
 	// Setting data into directory instance
-	err = rows.Scan(&f.Id, &f.Name, &f.FileId, &f.FileUniqueId, &f.FileSize)
+	err = rows.Scan(&f.Id, &f.Name, &f.FileId, &f.FileUniqueId, &f.FileSize, &f.ThumbnailFileId, &f.ThumbnailSource, &f.FileSource)
 	return f, err
 }
 // Function for getting available directories in directory
@@ -255,7 +252,7 @@ func (db *DataBase) GetAvailableItemsInDirectory (userId int64, directoryId int)
 	return DirectoryContent{
 		Directories: directories,
 		Files: files,
-	}, nil
+	}, err
 }
 // Function for getting array of id`s ("file"/"directory" - parameter 'name') from directory
 func (db *DataBase) GetIdsArray(directoryId int, name string) ([]int, error) {
@@ -316,5 +313,16 @@ func (db *DataBase) ResetUserData(userId int64) error {
 	}
 	// Deleting all user`s directories except the new root directory
 	req = fmt.Sprintf("delete from directories where userId=%d and id != %s", userId, directoryId)
+	return db.makeQuery(req)
+}
+// Updating source to file in database
+func (db *DataBase) UpdateSource(fileId int, newSource string, isThumbnail bool) error {
+	field := "fileSource"
+	if isThumbnail {
+		field = "thumbnailSource"
+	}
+	
+	req := fmt.Sprintf("update files set %s = '%s' where id=%d", field, newSource, fileId)
+	log.Print(req)
 	return db.makeQuery(req)
 }

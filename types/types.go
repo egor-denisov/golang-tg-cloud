@@ -34,6 +34,9 @@ type File struct {
 	FileId string `json:"file_id"`
 	FileUniqueId string `json:"file_unique_id"`
 	FileSize int `json:"file_size"`
+	ThumbnailFileId string `json:"thumbnail_file_id"`
+	ThumbnailSource string `json:"thumbnail_source"`
+	FileSource string `json:"file_source"`
 }
 
 type DirectoryContent struct {

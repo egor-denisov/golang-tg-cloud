@@ -72,11 +72,13 @@ func (cl *TgClient) proccessFile(msg *tgbotapi.Message) error {
 	var fileInfo File
 	// Setting information about the file
 	if msg.Photo != nil {
+		mainPhoto := msg.Photo[len(msg.Photo)-1]
 		fileInfo = File{
-			Name: "photo" + msg.Photo[0].FileUniqueID + ".jpg",
-			FileId: msg.Photo[0].FileID,
-			FileUniqueId: msg.Photo[0].FileUniqueID,
-			FileSize: msg.Photo[0].FileSize,
+			Name: "photo" + mainPhoto.FileUniqueID + ".jpg",
+			FileId: mainPhoto.FileID,
+			FileUniqueId: mainPhoto.FileUniqueID,
+			FileSize: mainPhoto.FileSize,
+			ThumbnailFileId: msg.Photo[0].FileID,
 		}
 	}else{
 		fileInfo = File{
@@ -84,11 +86,15 @@ func (cl *TgClient) proccessFile(msg *tgbotapi.Message) error {
 			FileId: msg.Document.FileID,
 			FileUniqueId: msg.Document.FileUniqueID,
 			FileSize: msg.Document.FileSize,
-			
 		}
 	}
+	// Getting current directory
+	directoryId, err := cl.db.GetCurrentDirectory(msg.From.ID)
+	if err != nil {
+		return err
+	}
 	// Creating a new file in the database
-	if _, err := cl.db.CreateNewFile(msg.From.ID, fileInfo); err != nil {	
+	if _, err := cl.db.CreateNewFile(msg.From.ID, directoryId, fileInfo); err != nil {	
 		return err
 	}
 	// Making reply to the user

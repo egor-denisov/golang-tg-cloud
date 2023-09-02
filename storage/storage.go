@@ -54,14 +54,9 @@ func (s *Storage) StartUploading() {
 }
 
 // Function return file bytes by file ID
-func (s *Storage) GetFileAsBytes(fileId string) (fileBytes []byte, err error) {
+func (s *Storage) GetFileAsBytes(url string) (fileBytes []byte, err error) {
 	defer func() { err = e.WrapIfErr("can`t get file from storage", err) }()
 
-	// Getting url from file id
-	url, err := s.bot.GetFileDirectURL(fileId)
-	if err != nil {
-		return nil, err
-	}
 	// Doing GET request to url
 	resp, err := http.Get(url)
 	if err != nil {
@@ -70,6 +65,11 @@ func (s *Storage) GetFileAsBytes(fileId string) (fileBytes []byte, err error) {
 	defer resp.Body.Close()
 	// Return bytes of content
 	return ioutil.ReadAll(resp.Body)
+}
+
+// Function for getting url based on telegram.org
+func (s *Storage) GetFileURL(fileId string) (string, error) {
+	return s.bot.GetFileDirectURL(fileId)
 }
 
 // Function upload a file to the tg server by sending message to user
@@ -89,19 +89,21 @@ func (s *Storage) UploadFile(item UploadingItem) (err error) {
 		return err
 	}
 	// Create new instance of file
+	thumbnailFileId := ""
+	if msg.Document.Thumbnail != nil {
+		thumbnailFileId = msg.Document.Thumbnail.FileID
+	}
 	file := File{
 		Name: msg.Document.FileName,
 		FileId: msg.Document.FileID,
 		FileUniqueId: msg.Document.FileUniqueID,
 		FileSize: msg.Document.FileSize,
+		ThumbnailFileId: thumbnailFileId,
 	}
+	
 	// Upload file to database
-	file.Id, err = s.db.CreateNewFile(int64(item.user.UserId), file)
+	file.Id, err = s.db.CreateNewFile(int64(item.user.UserId), item.directoryId, file)
 	if err != nil {
-		return err
-	}
-	// Adding uploaded file to directory
-	if err := s.db.AddFileToDirectory(item.directoryId, file); err != nil {
 		return err
 	}
 

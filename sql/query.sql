@@ -4,7 +4,10 @@ CREATE TABLE files
     Name varchar(255),
     FileId varchar(255),
     FileUniqueId varchar(255),
-    FileSize integer DEFAULT 0
+    FileSize integer DEFAULT 0,
+    ThumbnailFileId varchar(255) DEFAULT '',
+    ThumbnailSource varchar(255) DEFAULT '',
+    FileSource varchar(255) DEFAULT ''
 );
 
 CREATE TABLE directories

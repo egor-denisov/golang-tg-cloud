@@ -37,6 +37,7 @@ func New(db db.DataBase, s storage.Storage) ApiClient {
 	// Setting route for the router
 	res.router.GET("/directory", res.getDirecoryById)
 	res.router.GET("/file", res.getFileById)
+	res.router.GET("/thumbnail", res.getThumbnailById)
 	res.router.POST("/upload", res.uploadFile)
 	res.router.GET("/available", res.getAvailableItems)
 
@@ -79,13 +80,66 @@ func (api *ApiClient) getFileById(context *gin.Context) {
 		ProccessError(context, err)
 		return
 	}
+	// Checking hashing value in database
+	if len(fileData.FileSource) <= 0 {
+		fileData.FileSource, err = api.storage.GetFileURL(fileData.FileId)
+		if err != nil {
+			ProccessError(context, err)
+			return
+		}
+		if err := api.db.UpdateSource(fileData.Id, fileData.FileSource, false); err != nil {
+			ProccessError(context, err)
+			return
+		}
+	}
 	// Getting file as bytes from storage
-	fileBytes, err := api.storage.GetFileAsBytes(fileData.FileId)
+	fileBytes, err := api.storage.GetFileAsBytes(fileData.FileSource)
 	if err != nil {
 		ProccessError(context, err)
 		return 
 	}
 	// Setting headers and provide file for downloading
+	context.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+	context.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	context.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", fileData.Name))
+	http.ServeContent(context.Writer, context.Request, "filename", time.Now(), bytes.NewReader(fileBytes))
+}
+
+// Function returns a thumbnail by id
+func (api *ApiClient) getThumbnailById(context *gin.Context) {
+	// Getting the directory id from request parameters and convert it to a number
+	id, err := strconv.Atoi(context.Query("id"))
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	// Getting data about the file by id
+	fileData, err := api.db.GetFileById(id)
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	// Checking hashing value in database
+	if len(fileData.ThumbnailSource) <= 0 {
+		fileData.ThumbnailSource, err = api.storage.GetFileURL(fileData.ThumbnailFileId)
+		if err != nil {
+			ProccessError(context, err)
+			return
+		}
+		if err := api.db.UpdateSource(fileData.Id, fileData.ThumbnailSource, true); err != nil {
+			ProccessError(context, err)
+			return
+		}
+	}
+	// Getting file as bytes from storage
+	fileBytes, err := api.storage.GetFileAsBytes(fileData.ThumbnailSource)
+	if err != nil {
+		ProccessError(context, err)
+		return 
+	}
+	// Setting headers and provide file for downloading
+	context.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+	context.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 	context.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", fileData.Name))
 	http.ServeContent(context.Writer, context.Request, "filename", time.Now(), bytes.NewReader(fileBytes))
 }
@@ -142,8 +196,11 @@ func (api *ApiClient) getAvailableItems(context *gin.Context) {
 		return
 	}
 	// Return the directory data object
+	context.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+	context.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 	context.IndentedJSON(http.StatusOK, items)
 }
+
 // Function for proccessing errors in working of api
 func ProccessError(context *gin.Context, err error) {
 	log.Print(err)
