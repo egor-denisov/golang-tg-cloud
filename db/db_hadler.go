@@ -67,7 +67,7 @@ func (db *DataBase) CreateNewFile(userId int64, directoryId int, file File) (int
 		}
 	}else{
 		// Inserting file into database
-		idStr, err := db.insert("insert into files (Name, FileId, FileUniqueId, FileSize, ThumbnailFileId) values ($1, $2, $3, $4, $5, $6) returning Id", 
+		idStr, err := db.insert("insert into files (Name, FileId, FileUniqueId, FileSize, ThumbnailFileId) values ($1, $2, $3, $4, $5) returning Id", 
 				file.Name, file.FileId, file.FileUniqueId, file.FileSize, file.ThumbnailFileId)
 		
 		if err != nil {

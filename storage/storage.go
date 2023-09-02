@@ -15,7 +15,7 @@ import (
 type UploadingItem struct {
 	path     string
 	filename string
-	user     User
+	user_id     int
 	directoryId int
 }
 
@@ -83,7 +83,7 @@ func (s *Storage) UploadFile(item UploadingItem) (err error) {
 	}
 
 	// Create new instance of document and sending it to user
-	document := tgbotapi.NewDocument(int64(item.user.ChatId), tgbotapi.FilePath(newPath))
+	document := tgbotapi.NewDocument(int64(item.user_id), tgbotapi.FilePath(newPath))
 	msg, err := s.bot.Send(document)
 	if err != nil {
 		return err
@@ -102,7 +102,7 @@ func (s *Storage) UploadFile(item UploadingItem) (err error) {
 	}
 	
 	// Upload file to database
-	file.Id, err = s.db.CreateNewFile(int64(item.user.UserId), item.directoryId, file)
+	file.Id, err = s.db.CreateNewFile(int64(item.user_id), item.directoryId, file)
 	if err != nil {
 		return err
 	}
@@ -116,12 +116,12 @@ func (s *Storage) UploadFile(item UploadingItem) (err error) {
 }
 
 // Function for adding new item to queue channel
-func (s *Storage) AddToUploadingQueue(path string, filename string, user User, directoryId int) {
+func (s *Storage) AddToUploadingQueue(path string, filename string, user_id int, directoryId int) {
 	// Adding new item to queue channel
 	s.uploadingQueue <- UploadingItem{
 		path: path, 
 		filename: filename, 
-		user: user,
+		user_id: user_id,
 		directoryId: directoryId,
 	}
 }

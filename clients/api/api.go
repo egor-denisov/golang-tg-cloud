@@ -2,13 +2,11 @@ package api
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"log"
 	"main/db"
 	"main/lib/h"
 	"main/storage"
-	. "main/types"
 	"net/http"
 	"strconv"
 	"strings"
@@ -63,6 +61,8 @@ func (api *ApiClient) getDirecoryById(context *gin.Context) {
 		return
 	}
 	// Return the directory data object
+	context.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+	context.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 	context.IndentedJSON(http.StatusOK, d)
 }
 
@@ -158,21 +158,20 @@ func (api *ApiClient) uploadFile(context *gin.Context) {
 		ProccessError(context, err)
 		return
 	}
-	// Getting user data
-	var user User
-	userData := context.PostForm("user_data")
-	if err := json.Unmarshal([]byte(userData), &user); err != nil {
+	// Getting user id
+	userId, err := strconv.Atoi(context.PostForm("user_id"))
+	if err != nil {
 		ProccessError(context, err)
 		return
 	}
 	// Getting directory id
-	directoryId, err := strconv.Atoi(context.PostForm("directory"))
+	directoryId, err := strconv.Atoi(context.PostForm("directory_id"))
 	if err != nil {
 		ProccessError(context, err)
 		return
 	}
 	// Adding our data in queue for later adding to telegram server
-	api.storage.AddToUploadingQueue(path, headers.Filename, user, directoryId)
+	api.storage.AddToUploadingQueue(path, headers.Filename, userId, directoryId)
 }
 
 // Function for getting available files and directories
