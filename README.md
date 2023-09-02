@@ -28,6 +28,15 @@ Live demo is available here:
 
 At the moment, the project is under development. Now some features of the api of the service and Telegram bot are available for operation. To visualize the possibilities, a frontend is being developed on react.js
 
+#### Examples of bot work
+
+<div style="display: flex;">
+  <img src="https://sun9-43.userapi.com/impg/BsXAOQ08UIfhqvRvjzrD1nqFPZ-vaA-GuQmXSw/fF1WG-ZMz4Y.jpg?size=591x1280&quality=95&sign=ed309f47873c5c78a81295d6d7993009&type=album" width="300" title="Uploading picture and files"/>
+  <img src="https://sun9-27.userapi.com/impg/x51dT-TkouAF5AaobKjCmN08UWR-387fVSLoSA/Xd4W8esq9e4.jpg?size=591x1280&quality=95&sign=b6aa0ec3f96c72b2fb1a02025330ab51&type=album" width="300" title="Getting file"/>
+  <img src="https://sun9-32.userapi.com/impg/Fu1q5XLkl5QfFq41B5lfmcOpaDrS2cpxlGHh7g/qX552dJKhgM.jpg?size=591x1280&quality=95&sign=677fa105e374d383e08d3626cfb6ca41&type=album" width="300" title="Creating folder"/>
+</div>
+
+
 ## Running the project
 1) For starting Telegram version you need get token from https://t.me/BotFather. 
 2) To run this project, you will need to add the following environment variables to your ***environment/env.go*** file:
