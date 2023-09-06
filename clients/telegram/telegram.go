@@ -279,7 +279,7 @@ func proccessError(err error) string {
 		case "can`t proccess message: directory with this name already exists in current folder":
 			return "Directory with this name already exists in current folder"
 		case "can`t proccess message: wrong folder name":
-			return "Sorry, but folder cannot have this name"
+			return "Sorry, but folder cannot have this name. Check that you entered the command in this format: /create_folder <name>"
 		case "can`t proccess message: can`t make reply after requesting: file is not available from this folder":
 			return "Sorry, this file does not exist"
 		case "can`t proccess message: can`t make reply after requesting directory: this directory is root":

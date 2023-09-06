@@ -25,7 +25,6 @@ CREATE TABLE users
 (
    	Id serial PRIMARY KEY,
     Username varchar(255),
-    ChatID integer,
     UserID integer,
     FirstName varchar(255),
     LastName varchar(255),

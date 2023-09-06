@@ -16,15 +16,13 @@ func (db *DataBase) CreateRootDirectory(directory Directory) (string, error) {
 		directory.Name, directory.UserId)
 }
 //Function for creating new directory
-func (db *DataBase) CreateNewDirectory(userId int64, directory Directory) (string, error) {
-	// Getting current directory and setting as parent directory
-	currentDirectoryId, err := db.GetCurrentDirectory(userId)
-	if err != nil {
-		return "", err
+func (db *DataBase) CreateNewDirectory(directory Directory) (string, error) {
+	// Checking the correctness for a directory name
+	if !h.IsValidName(directory.Name) {
+		return "", fmt.Errorf("wrong folder name")
 	}
-	directory.ParentId = currentDirectoryId
 	// Checking existence of folder with current name
-	existence, err := db.FolderExists(userId, currentDirectoryId, directory.Name)
+	existence, err := db.FolderExists(int64(directory.UserId), directory.ParentId, directory.Name)
 	if err != nil {
 		return "", err
 	}
@@ -34,7 +32,7 @@ func (db *DataBase) CreateNewDirectory(userId int64, directory Directory) (strin
 	}
 	// Inserting new directory into database
 	id, err := db.insert("insert into directories (ParentId, Name, UserId) values ($1, $2, $3) returning Id", 
-		currentDirectoryId, directory.Name, userId)
+		directory.ParentId, directory.Name, directory.UserId)
 	if err != nil {
 		return "", err
 	}
@@ -44,7 +42,7 @@ func (db *DataBase) CreateNewDirectory(userId int64, directory Directory) (strin
 		return "", err
 	}
 	// Returning id of new directory and result of adding new directory
-	return id, db.AddNewDirectoryToDirectory(currentDirectoryId, newDirectoryId)
+	return id, db.AddNewDirectoryToDirectory(directory.ParentId, newDirectoryId)
 }
 // Function for creating a new file
 func (db *DataBase) CreateNewFile(userId int64, directoryId int, file File) (int, error) {
@@ -136,8 +134,8 @@ func (db *DataBase) CreateNewUser(user User) (string, error) {
 		return "", err
 	}
 	// Inserting a new user into the database
-	return db.insert("insert into users (Username, ChatID, UserID, FirstName, LastName, CurrentDirectory) values ($1, $2, $3, $4, $5, $6) returning Id", 
-		user.UserName, user.ChatId, user.UserId, user.FirstName, user.LastName, directoryId)
+	return db.insert("insert into users (Username, UserID, FirstName, LastName, CurrentDirectory) values ($1, $2, $3, $4, $5) returning Id", 
+		user.UserName, user.UserId, user.FirstName, user.LastName, directoryId)
 }
 // Function for checking existence of user by userId
 func (db *DataBase) UserExists(userId int64) (bool, error) {
@@ -214,6 +212,12 @@ func (db *DataBase) GetAvailableDirectoriesInDiretory(userId int64, directoryId 
 		if err != nil {
 			return res, err
 		}
+		res = append(res, d)
+	}
+	// Adding parrent directory
+	d, err := db.GetParentDirectory(directoryId)
+	if err == nil {
+		d.Name = "../"
 		res = append(res, d)
 	}
 	// Returning result array
@@ -325,4 +329,17 @@ func (db *DataBase) UpdateSource(fileId int, newSource string, isThumbnail bool)
 	req := fmt.Sprintf("update files set %s = '%s' where id=%d", field, newSource, fileId)
 	log.Print(req)
 	return db.makeQuery(req)
+}
+// Getting user data from database
+func (db *DataBase) GetUserInfo(userId int64) (user User, err error) {
+	u := User{}
+	req := fmt.Sprintf("select * from users where UserID = %d", userId)
+	rows, err := db.selectRows(req)
+	if err != nil {
+		return u, err
+	}
+	rows.Next()
+	// Setting data into user instance
+	err = rows.Scan(&u.Id, &u.UserName, &u.UserId, &u.FirstName, &u.LastName, &u.CurrentDirectory)
+	return u, err
 }

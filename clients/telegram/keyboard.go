@@ -39,15 +39,10 @@ func createKeyboardNavigator(directories []Directory, files []File) tgbotapi.Rep
 	// Iteration over the directories and getting its names
 	for _, dir := range directories {
 		current := tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton(dir.Name),
+			tgbotapi.NewKeyboardButton("./" + dir.Name),
 		)
 		rows = append(rows, current)
 	}
-	// Creating 'go back' button and adding it to the list of rows
-	goBackBtn := tgbotapi.NewKeyboardButtonRow(
-		tgbotapi.NewKeyboardButton("../"),
-	)
-	rows = append(rows, goBackBtn)
 	
 	return tgbotapi.NewOneTimeReplyKeyboard(rows...)
 }

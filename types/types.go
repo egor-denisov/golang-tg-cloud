@@ -12,10 +12,10 @@ type Content struct {
 type User struct {
 	Id int `json:"id"`
 	UserName string `json:"username"`
-	ChatId int `json:"chat_id"`
 	UserId int `json:"user_id"`
 	FirstName string `json:"firstname"`
 	LastName string `json:"lastname"`
+	CurrentDirectory int `json:"current_directory"`
 }
 
 type Directory struct {

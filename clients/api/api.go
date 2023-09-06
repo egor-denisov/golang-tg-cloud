@@ -2,11 +2,13 @@ package api
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"log"
 	"main/db"
 	"main/lib/h"
 	"main/storage"
+	. "main/types"
 	"net/http"
 	"strconv"
 	"strings"
@@ -38,7 +40,10 @@ func New(db db.DataBase, s storage.Storage) ApiClient {
 	res.router.GET("/thumbnail", res.getThumbnailById)
 	res.router.POST("/upload", res.uploadFile)
 	res.router.GET("/available", res.getAvailableItems)
+	res.router.GET("/auth", res.authorization)
+	res.router.GET("/createDirectory", res.createDirectory)
 
+	res.router.OPTIONS("/upload", res.preloader)
 	return res
 }
 
@@ -143,10 +148,19 @@ func (api *ApiClient) getThumbnailById(context *gin.Context) {
 	context.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", fileData.Name))
 	http.ServeContent(context.Writer, context.Request, "filename", time.Now(), bytes.NewReader(fileBytes))
 }
-
+// Function for sending headers for uploading files
+func (api *ApiClient) preloader(context *gin.Context) {
+	context.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+	context.Writer.Header().Set("Access-Control-Allow-Credential", "true")
+	context.Writer.Header().Set("Access-Control-Allow-Methods", "GET,HEAD,OPTIONS,POST,PUT")
+	context.Writer.Header().Set("Access-Control-Allow-Headers", "Access-Control-Allow-Headers, Origin,Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers")
+}
 // Function for uploading new files 
 func (api *ApiClient) uploadFile(context *gin.Context) {
+	context.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+	context.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 	// Getting uploaded file
+	fmt.Printf("%+v\n", context.Request.Header)
 	_, headers, err := context.Request.FormFile("file")
 	if err != nil {
 		ProccessError(context, err)
@@ -200,14 +214,56 @@ func (api *ApiClient) getAvailableItems(context *gin.Context) {
 	context.IndentedJSON(http.StatusOK, items)
 }
 
+// Function for authorization user
+func (api *ApiClient) authorization(context *gin.Context) {
+	// Getting user_id from data
+	userId, err := strconv.Atoi(context.Query("user_id"))
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	userInfo, err := api.db.GetUserInfo(int64(userId))
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	context.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+	context.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	context.IndentedJSON(http.StatusOK, userInfo)
+}
+
+// Function for creating directory
+func (api *ApiClient) createDirectory(context *gin.Context) {
+	// Getting the directory id from request parameters and convert it to a number
+	var directoryInfo Directory
+	if err := json.Unmarshal([]byte(context.Query("directory")), &directoryInfo); err != nil {
+		ProccessError(context, err)
+		return
+	}
+	// Creating new folder in the database
+	if _, err := api.db.CreateNewDirectory(directoryInfo); err != nil {
+		ProccessError(context, err)
+		return
+	}
+	context.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+	context.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	context.IndentedJSON(http.StatusOK, "ok")
+}
+
 // Function for proccessing errors in working of api
 func ProccessError(context *gin.Context, err error) {
 	log.Print(err)
+	context.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+	context.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 	switch strings.Split(err.Error(), ":")[0] {
 	case "sql":
 		context.IndentedJSON(http.StatusNotFound, "Not found")
 	case "strconv.Atoi":
 		context.IndentedJSON(http.StatusNotAcceptable, "Wrong format of request")
+	case "directory with this name already exists in current folder":
+		context.IndentedJSON(http.StatusNotAcceptable, "Directory with this name already exists in current folder")
+	case "wrong folder name":
+		context.IndentedJSON(http.StatusNotAcceptable, "Directory name is uncorrectly. Don`t use symbols: <, >, :, «, /,\\ , |, ?, *")
 	default: 
 		context.IndentedJSON(http.StatusInternalServerError, err.Error())
 	}

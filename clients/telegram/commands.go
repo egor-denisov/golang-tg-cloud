@@ -1,8 +1,6 @@
 package telegram
 
 import (
-	"fmt"
-	"main/lib/h"
 	. "main/types"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -32,7 +30,6 @@ func startCommand(cl *TgClient, msg *tgbotapi.Message) error {
 	}
 	// Creating instance of a new user
 	userInfo := User{
-		ChatId:    int(msg.Chat.ID),
 		UserId:    int(msg.From.ID),
 		UserName:  msg.From.UserName,
 		FirstName: msg.From.FirstName,
@@ -50,7 +47,7 @@ func startCommand(cl *TgClient, msg *tgbotapi.Message) error {
 func helpCommand(cl *TgClient, msg *tgbotapi.Message) error {
 	// Creating content for replying
 	content := Content{
-		Text: "You can use /search for search file. Also you can see all files in current directory with /showAll.",
+		Text: "Send the files to add in folder and use command /create_folder to create new folder",
 	}
 	// Sending replying message
 	return cl.sendMedia(msg.Chat.ID, content)
@@ -58,18 +55,19 @@ func helpCommand(cl *TgClient, msg *tgbotapi.Message) error {
 
 // Action for replying to the 'create folder' command
 func createFolderCommand(cl *TgClient, msg *tgbotapi.Message) error {
+	// Getting current directory and setting as parent directory
+	currentDirectoryId, err := cl.db.GetCurrentDirectory(msg.From.ID)
+	if err != nil {
+		return err
+	}
 	// Creating instance of a new directory
 	directory := Directory{
 		Name: msg.CommandArguments(),
+		ParentId: currentDirectoryId,
+		UserId: int(msg.From.ID),
 	}
-	// Checking the correctness for a directory name
-	if !h.IsValidName(directory.Name) {
-		return fmt.Errorf("wrong folder name")
-	}
-	// Adding prefix for highlighting directory
-	directory.Name = "./" + directory.Name
 	// Creating a new directory in database
-	if _, err := cl.db.CreateNewDirectory(msg.From.ID, directory); err != nil {	
+	if _, err := cl.db.CreateNewDirectory(directory); err != nil {	
 		return err
 	}
 	// Making response for user after creating directory
