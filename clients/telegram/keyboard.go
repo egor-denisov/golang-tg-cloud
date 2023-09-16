@@ -29,17 +29,20 @@ func createEmptyKeyboard() tgbotapi.ReplyKeyboardRemove {
 func createKeyboardNavigator(directories []Directory, files []File) tgbotapi.ReplyKeyboardMarkup {
 	// Inicializing empty keyboard rows
 	rows := [][]tgbotapi.KeyboardButton{}
+	// Iteration over the directories and getting its names
+	for _, dir := range directories {
+		if dir.Name != "../" {
+			dir.Name = "./" + dir.Name
+		}
+		current := tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton(dir.Name),
+		)
+		rows = append(rows, current)
+	}
 	// Iteration over the files and getting its names
 	for _, file := range files {
 		current := tgbotapi.NewKeyboardButtonRow(
 			tgbotapi.NewKeyboardButton(file.Name),
-		)
-		rows = append(rows, current)
-	}
-	// Iteration over the directories and getting its names
-	for _, dir := range directories {
-		current := tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton("./" + dir.Name),
 		)
 		rows = append(rows, current)
 	}

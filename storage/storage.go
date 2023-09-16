@@ -99,6 +99,7 @@ func (s *Storage) UploadFile(item UploadingItem) (err error) {
 		FileUniqueId: msg.Document.FileUniqueID,
 		FileSize: msg.Document.FileSize,
 		ThumbnailFileId: thumbnailFileId,
+		FileType: msg.Document.MimeType,
 	}
 	
 	// Upload file to database

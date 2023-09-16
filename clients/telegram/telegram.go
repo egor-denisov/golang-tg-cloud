@@ -79,6 +79,7 @@ func (cl *TgClient) proccessFile(msg *tgbotapi.Message) error {
 			FileUniqueId: mainPhoto.FileUniqueID,
 			FileSize: mainPhoto.FileSize,
 			ThumbnailFileId: msg.Photo[0].FileID,
+			FileType: "image/jpg",
 		}
 	}else{
 		fileInfo = File{
@@ -86,6 +87,7 @@ func (cl *TgClient) proccessFile(msg *tgbotapi.Message) error {
 			FileId: msg.Document.FileID,
 			FileUniqueId: msg.Document.FileUniqueID,
 			FileSize: msg.Document.FileSize,
+			FileType: msg.Document.MimeType,
 		}
 	}
 	// Getting current directory
@@ -200,13 +202,13 @@ func (cl *TgClient) makeReplyAfterRequestingDirectory(userId int64, reqString st
 		}
 		// Iterating through available directories and finding matching name
 		for _, d := range availableDirectory {
-			if d.Name == reqString {
+			if d.Name == reqString[2:] {
 				directory = d
 				break
 			}
 		}
 		// Checking result
-		if directory.Name != reqString {
+		if directory.Name != reqString[2:] {
 			return fmt.Errorf("directory is not available from this folder")
 		}
 	}

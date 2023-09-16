@@ -5,6 +5,8 @@ CREATE TABLE files
     FileId varchar(255),
     FileUniqueId varchar(255),
     FileSize integer DEFAULT 0,
+    FileType varchar(255),
+    Created timestamp,
     ThumbnailFileId varchar(255) DEFAULT '',
     ThumbnailSource varchar(255) DEFAULT '',
     FileSource varchar(255) DEFAULT ''
@@ -16,9 +18,11 @@ CREATE TABLE directories
     ParentId integer DEFAULT -1,
     Name varchar(255),
     UserID integer,
-    Files integer[],
-    Directories integer[],
-    Size integer DEFAULT 0
+    Files integer[] DEFAULT '{}',
+    Directories integer[] DEFAULT '{}',
+    Size integer DEFAULT 0,
+    Path varchar(255),
+    Created timestamp
 );
 
 CREATE TABLE users

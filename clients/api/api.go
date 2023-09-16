@@ -42,6 +42,7 @@ func New(db db.DataBase, s storage.Storage) ApiClient {
 	res.router.GET("/available", res.getAvailableItems)
 	res.router.GET("/auth", res.authorization)
 	res.router.GET("/createDirectory", res.createDirectory)
+	res.router.GET("/edit", res.editItem)
 
 	res.router.OPTIONS("/upload", res.preloader)
 	return res
@@ -66,8 +67,7 @@ func (api *ApiClient) getDirecoryById(context *gin.Context) {
 		return
 	}
 	// Return the directory data object
-	context.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-	context.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	setHeaders(context)
 	context.IndentedJSON(http.StatusOK, d)
 }
 
@@ -104,8 +104,7 @@ func (api *ApiClient) getFileById(context *gin.Context) {
 		return 
 	}
 	// Setting headers and provide file for downloading
-	context.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-	context.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	setHeaders(context)
 	context.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", fileData.Name))
 	http.ServeContent(context.Writer, context.Request, "filename", time.Now(), bytes.NewReader(fileBytes))
 }
@@ -143,22 +142,17 @@ func (api *ApiClient) getThumbnailById(context *gin.Context) {
 		return 
 	}
 	// Setting headers and provide file for downloading
-	context.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-	context.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	setHeaders(context)
 	context.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", fileData.Name))
 	http.ServeContent(context.Writer, context.Request, "filename", time.Now(), bytes.NewReader(fileBytes))
 }
 // Function for sending headers for uploading files
 func (api *ApiClient) preloader(context *gin.Context) {
-	context.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-	context.Writer.Header().Set("Access-Control-Allow-Credential", "true")
-	context.Writer.Header().Set("Access-Control-Allow-Methods", "GET,HEAD,OPTIONS,POST,PUT")
-	context.Writer.Header().Set("Access-Control-Allow-Headers", "Access-Control-Allow-Headers, Origin,Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers")
+	setHeaders(context)
 }
 // Function for uploading new files 
 func (api *ApiClient) uploadFile(context *gin.Context) {
-	context.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-	context.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	setHeaders(context)
 	// Getting uploaded file
 	fmt.Printf("%+v\n", context.Request.Header)
 	_, headers, err := context.Request.FormFile("file")
@@ -184,6 +178,7 @@ func (api *ApiClient) uploadFile(context *gin.Context) {
 		ProccessError(context, err)
 		return
 	}
+	
 	// Adding our data in queue for later adding to telegram server
 	api.storage.AddToUploadingQueue(path, headers.Filename, userId, directoryId)
 }
@@ -209,8 +204,7 @@ func (api *ApiClient) getAvailableItems(context *gin.Context) {
 		return
 	}
 	// Return the directory data object
-	context.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-	context.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	setHeaders(context)
 	context.IndentedJSON(http.StatusOK, items)
 }
 
@@ -227,9 +221,27 @@ func (api *ApiClient) authorization(context *gin.Context) {
 		ProccessError(context, err)
 		return
 	}
-	context.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-	context.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	setHeaders(context)
 	context.IndentedJSON(http.StatusOK, userInfo)
+}
+
+// Function for editing the file or directory
+func (api *ApiClient) editItem(context *gin.Context) {
+	// Getting user_id from data
+	id, err := strconv.Atoi(context.Query("id"))
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	newName := context.Query("name")
+	typeItem := context.Query("type")
+
+	setHeaders(context)
+	// Setting new name
+	if err := api.db.UpdateItemName(id, newName, typeItem); err != nil {
+		ProccessError(context, err)
+		return
+	}
 }
 
 // Function for creating directory
@@ -245,16 +257,14 @@ func (api *ApiClient) createDirectory(context *gin.Context) {
 		ProccessError(context, err)
 		return
 	}
-	context.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-	context.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	setHeaders(context)
 	context.IndentedJSON(http.StatusOK, "ok")
 }
 
 // Function for proccessing errors in working of api
 func ProccessError(context *gin.Context, err error) {
 	log.Print(err)
-	context.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-	context.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	setHeaders(context)
 	switch strings.Split(err.Error(), ":")[0] {
 	case "sql":
 		context.IndentedJSON(http.StatusNotFound, "Not found")
@@ -268,4 +278,12 @@ func ProccessError(context *gin.Context, err error) {
 		context.IndentedJSON(http.StatusInternalServerError, err.Error())
 	}
 	
+}
+// Function for creating headers
+func setHeaders(context *gin.Context) {
+	context.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+	context.Writer.Header().Set("Access-Control-Allow-Credential", "true")
+	context.Writer.Header().Set("Access-Control-Allow-Methods", "GET,HEAD,OPTIONS,POST,PUT")
+	context.Writer.Header().Set("Access-Control-Allow-Headers", "Access-Control-Allow-Headers, Origin,Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers")
+
 }

@@ -60,11 +60,16 @@ func createFolderCommand(cl *TgClient, msg *tgbotapi.Message) error {
 	if err != nil {
 		return err
 	}
+	currentDirectory, err := cl.db.GetDirectory(currentDirectoryId)
+	if err != nil {
+		return err
+	}
 	// Creating instance of a new directory
 	directory := Directory{
 		Name: msg.CommandArguments(),
 		ParentId: currentDirectoryId,
 		UserId: int(msg.From.ID),
+		Path: currentDirectory.Path + "/" + msg.CommandArguments(),
 	}
 	// Creating a new directory in database
 	if _, err := cl.db.CreateNewDirectory(directory); err != nil {	

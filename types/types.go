@@ -1,6 +1,10 @@
 package types
 
-import tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+import (
+	"time"
+
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+)
 
 type Content struct {
 	Text     string `json:"text"`
@@ -26,6 +30,8 @@ type Directory struct {
 	Files []int `json:"files"`
 	Directories []int `json:"directories"`
 	Size int `json:"size"`
+	Path string `json:"path"`
+	Created time.Time `json:"created"`
 }
 
 type File struct {
@@ -34,6 +40,8 @@ type File struct {
 	FileId string `json:"file_id"`
 	FileUniqueId string `json:"file_unique_id"`
 	FileSize int `json:"file_size"`
+	FileType string `json:"file_type"`
+	Created time.Time `json:"created"`
 	ThumbnailFileId string `json:"thumbnail_file_id"`
 	ThumbnailSource string `json:"thumbnail_source"`
 	FileSource string `json:"file_source"`

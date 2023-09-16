@@ -12,7 +12,7 @@ import (
 
 //Function for creating root directory
 func (db *DataBase) CreateRootDirectory(directory Directory) (string, error) {
-	return db.insert("insert into directories (Name, UserId) values ($1, $2) returning Id", 
+	return db.insert("insert into directories (Name, ParentId, UserId, Path, Created) values ($1, -1, $2, $1, now()) returning Id", 
 		directory.Name, directory.UserId)
 }
 //Function for creating new directory
@@ -30,9 +30,14 @@ func (db *DataBase) CreateNewDirectory(directory Directory) (string, error) {
 	if existence {
 		return "", fmt.Errorf("directory with this name already exists in current folder")
 	}
+	// Getting parent directory data
+	currentDirectory, err := db.GetDirectory(directory.ParentId)
+	if err != nil {
+		return "", err
+	}
 	// Inserting new directory into database
-	id, err := db.insert("insert into directories (ParentId, Name, UserId) values ($1, $2, $3) returning Id", 
-		directory.ParentId, directory.Name, directory.UserId)
+	id, err := db.insert("insert into directories (Name, ParentId, UserId, Path, Created) values ($1, $2, $3, $4, now()) returning Id", 
+		directory.Name, directory.ParentId, directory.UserId, currentDirectory.Path + directory.Name + "/")
 	if err != nil {
 		return "", err
 	}
@@ -65,8 +70,8 @@ func (db *DataBase) CreateNewFile(userId int64, directoryId int, file File) (int
 		}
 	}else{
 		// Inserting file into database
-		idStr, err := db.insert("insert into files (Name, FileId, FileUniqueId, FileSize, ThumbnailFileId) values ($1, $2, $3, $4, $5) returning Id", 
-				file.Name, file.FileId, file.FileUniqueId, file.FileSize, file.ThumbnailFileId)
+		idStr, err := db.insert("insert into files (Name, FileId, FileUniqueId, FileType, Created, FileSize, ThumbnailFileId) values ($1, $2, $3, $4, now(), $5, $6) returning Id", 
+				file.Name, file.FileId, file.FileUniqueId, file.FileType, file.FileSize, file.ThumbnailFileId)
 		
 		if err != nil {
 			return -1, err
@@ -129,7 +134,7 @@ func (db *DataBase) CreateNewUser(user User) (string, error) {
 		return "", errors.New("user already exists")
 	}
 	// Creating a root directory for user
-	directoryId, err := db.CreateRootDirectory(Directory{Name : "/", UserId: user.UserId})
+	directoryId, err := db.CreateRootDirectory(Directory{Name : "(root)/", UserId: user.UserId})
 	if err != nil {
 		return "", err
 	}
@@ -174,14 +179,25 @@ func (db *DataBase) GetCurrentDirectory(userId int64) (int, error) {
 // Function for getting information about directory by id
 func (db *DataBase) GetDirectory(id int) (Directory, error) {
 	d := Directory{}
-	req := fmt.Sprintf("select id, parentId, name, userId, size from directories where id = %d", id)
+	req := fmt.Sprintf("select id, parentId, name, userId, size, path, created from directories where id = %d", id)
 	rows, err := db.selectRows(req)
 	if err != nil {
 		return d, err
 	}
 	rows.Next()
 	// Setting data into directory instance
-	err = rows.Scan(&d.Id, &d.ParentId, &d.Name, &d.UserId, &d.Size)
+	if err := rows.Scan(&d.Id, &d.ParentId, &d.Name, &d.UserId, &d.Size, &d.Path, &d.Created); err != nil {
+		return d, err
+	}
+	// Setting files and directories id`s
+	d.Files, err = db.GetIdsArray(id, "files")
+	if err != nil {
+		return d, err
+	}
+	d.Directories, err = db.GetIdsArray(id, "directories")
+	if err != nil {
+		return d, err
+	}
 	return d, err
 }
 // Function for getting the file information by id
@@ -194,13 +210,18 @@ func (db *DataBase) GetFileById(id int) (File, error) {
 	}
 	rows.Next()
 	// Setting data into directory instance
-	err = rows.Scan(&f.Id, &f.Name, &f.FileId, &f.FileUniqueId, &f.FileSize, &f.ThumbnailFileId, &f.ThumbnailSource, &f.FileSource)
+	err = rows.Scan(&f.Id, &f.Name, &f.FileId, &f.FileUniqueId, &f.FileSize, &f.FileType, &f.Created, &f.ThumbnailFileId, &f.ThumbnailSource, &f.FileSource)
 	return f, err
 }
 // Function for getting available directories in directory
 func (db *DataBase) GetAvailableDirectoriesInDiretory(userId int64, directoryId int) ([]Directory, error) {
 	var res []Directory
-
+	// Adding parrent directory
+	d, err := db.GetParentDirectory(directoryId)
+	if err == nil {
+		d.Name = "../"
+		res = append(res, d)
+	}
 	// Getting an array of directory ids contained in the directory
 	arr, err := db.GetIdsArray(directoryId, "directories")
 	if err != nil {
@@ -212,12 +233,6 @@ func (db *DataBase) GetAvailableDirectoriesInDiretory(userId int64, directoryId 
 		if err != nil {
 			return res, err
 		}
-		res = append(res, d)
-	}
-	// Adding parrent directory
-	d, err := db.GetParentDirectory(directoryId)
-	if err == nil {
-		d.Name = "../"
 		res = append(res, d)
 	}
 	// Returning result array
@@ -258,7 +273,7 @@ func (db *DataBase) GetAvailableItemsInDirectory (userId int64, directoryId int)
 		Files: files,
 	}, err
 }
-// Function for getting array of id`s ("file"/"directory" - parameter 'name') from directory
+// Function for getting array of id`s ("files"/"directories" - parameter 'name') from directory
 func (db *DataBase) GetIdsArray(directoryId int, name string) ([]int, error) {
 	req := fmt.Sprintf("select %s from directories where id = %d", name, directoryId)
 	idsStr, err := db.selectRow(req)
@@ -268,7 +283,7 @@ func (db *DataBase) GetIdsArray(directoryId int, name string) ([]int, error) {
 	// Parsing JSON and returning an array of integers
 	return h.ParseIds(idsStr)
 }
-// Function for getting array of id`s ("file"/"directory" - parameter 'name') from directory
+// Function for getting array of id`s ("files"/"directories" - parameter 'name') from directory
 func (db *DataBase) GetNamesArray(directoryId int, name string) ([]string, error) {
 	req := fmt.Sprintf("select %s from directories where id = %d", name, directoryId)
 	idsStr, err := db.selectRow(req)
@@ -306,7 +321,7 @@ func (db *DataBase) GetNamesArray(directoryId int, name string) ([]string, error
 // Reseting the root directory from the database for user
 func (db *DataBase) ResetUserData(userId int64) error {
 	// Creating new root directory for user
-	directoryId, err := db.CreateRootDirectory(Directory{Name : "/", UserId: int(userId)})
+	directoryId, err := db.CreateRootDirectory(Directory{Name : "(root)/", UserId: int(userId)})
 	if err != nil {
 		return err
 	}
@@ -342,4 +357,56 @@ func (db *DataBase) GetUserInfo(userId int64) (user User, err error) {
 	// Setting data into user instance
 	err = rows.Scan(&u.Id, &u.UserName, &u.UserId, &u.FirstName, &u.LastName, &u.CurrentDirectory)
 	return u, err
+}
+
+// Function for updating item name
+func (db *DataBase) UpdateItemName(id int, newName string, typeItem string) error {
+	if typeItem != "directory" {
+		// make request if its file updating
+		req := fmt.Sprintf("update files set name = '%s' where id=%d", newName, id)
+		return db.makeQuery(req)
+	}
+	// else getting directory info
+	directory, err := db.GetDirectory(id)
+	if err != nil {
+		return err
+	}
+	// check if it is not root directory
+	if directory.ParentId == -1 {
+		return fmt.Errorf("you cannot rename a root directory")
+	}
+	// make directory updating request
+	req := fmt.Sprintf("update directories set name = '%s' where id=%d", newName, id)
+	if err := db.makeQuery(req); err != nil {
+		return err
+	}
+	// create new path and update it for all child elements
+	p := strings.Split(directory.Path, "/")
+	return db.UpdatePath(id, strings.Join(p[:len(p) - 2], "/") + "/")
+	
+}
+
+func (db *DataBase) UpdatePath(id int, path string) error {
+	req := fmt.Sprintf("update directories set path = CONCAT('%s', name, '/') where id=%d returning path, directories", path, id)
+	rows, err := db.selectRows(req)
+	if err != nil {
+		return err
+	}
+	rows.Next()
+	var newPath, directoriesStr string;
+	if err := rows.Scan(&newPath, &directoriesStr); err != nil {
+		return err
+	}
+	fmt.Print(newPath, directoriesStr)
+	directories, err := h.ParseIds(directoriesStr);
+	if err != nil {
+		return err
+	}
+	for _, childId := range directories {
+		err := db.UpdatePath(childId, newPath)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
