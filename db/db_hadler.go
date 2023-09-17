@@ -181,6 +181,7 @@ func (db *DataBase) GetDirectory(id int) (Directory, error) {
 	d := Directory{}
 	req := fmt.Sprintf("select id, parentId, name, userId, size, path, created from directories where id = %d", id)
 	rows, err := db.selectRows(req)
+	defer rows.Close()
 	if err != nil {
 		return d, err
 	}
@@ -205,6 +206,7 @@ func (db *DataBase) GetFileById(id int) (File, error) {
 	f := File{}
 	req := fmt.Sprintf("select * from files where id = %d", id)
 	rows, err := db.selectRows(req)
+	defer rows.Close()
 	if err != nil {
 		return f, err
 	}
@@ -302,6 +304,7 @@ func (db *DataBase) GetNamesArray(directoryId int, name string) ([]string, error
 	// Getting name for each id
 	req = fmt.Sprintf("select name from directories where id in ( %s )", strings.Join(h.IntArrayToStrArray(ids), ", "))
 	rows, err := db.selectRows(req)
+	defer rows.Close()
 	if err != nil {
 		return nil, err
 	}
@@ -350,6 +353,7 @@ func (db *DataBase) GetUserInfo(userId int64) (user User, err error) {
 	u := User{}
 	req := fmt.Sprintf("select * from users where UserID = %d", userId)
 	rows, err := db.selectRows(req)
+	defer rows.Close()
 	if err != nil {
 		return u, err
 	}
@@ -389,6 +393,7 @@ func (db *DataBase) UpdateItemName(id int, newName string, typeItem string) erro
 func (db *DataBase) UpdatePath(id int, path string) error {
 	req := fmt.Sprintf("update directories set path = CONCAT('%s', name, '/') where id=%d returning path, directories", path, id)
 	rows, err := db.selectRows(req)
+	defer rows.Close()
 	if err != nil {
 		return err
 	}

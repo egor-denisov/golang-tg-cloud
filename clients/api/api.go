@@ -253,12 +253,13 @@ func (api *ApiClient) createDirectory(context *gin.Context) {
 		return
 	}
 	// Creating new folder in the database
-	if _, err := api.db.CreateNewDirectory(directoryInfo); err != nil {
+	id, err := api.db.CreateNewDirectory(directoryInfo)
+	if err != nil {
 		ProccessError(context, err)
 		return
 	}
 	setHeaders(context)
-	context.IndentedJSON(http.StatusOK, "ok")
+	context.IndentedJSON(http.StatusOK, gin.H{"id": id})
 }
 
 // Function for proccessing errors in working of api
