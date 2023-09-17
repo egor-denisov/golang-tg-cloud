@@ -43,6 +43,7 @@ func New(db db.DataBase, s storage.Storage) ApiClient {
 	res.router.GET("/auth", res.authorization)
 	res.router.GET("/createDirectory", res.createDirectory)
 	res.router.GET("/edit", res.editItem)
+	res.router.GET("/delete", res.deleteItem)
 
 	res.router.OPTIONS("/upload", res.preloader)
 	return res
@@ -260,6 +261,29 @@ func (api *ApiClient) createDirectory(context *gin.Context) {
 	}
 	setHeaders(context)
 	context.IndentedJSON(http.StatusOK, gin.H{"id": id})
+}
+
+// Function for erasing the file or directory
+func (api *ApiClient) deleteItem(context *gin.Context) {
+	// Getting user_id from data
+	id, err := strconv.Atoi(context.Query("id"))
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	directoryId, err := strconv.Atoi(context.Query("directory_id"))
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	typeItem := context.Query("type")
+
+	setHeaders(context)
+	// Setting new name
+	if err := api.db.DeleteItem(id, directoryId, typeItem); err != nil {
+		ProccessError(context, err)
+		return
+	}
 }
 
 // Function for proccessing errors in working of api

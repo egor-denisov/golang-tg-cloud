@@ -364,6 +364,9 @@ func (db *DataBase) GetUserInfo(userId int64) (user User, err error) {
 }
 
 // Function for updating item name
+
+//////////////////////////////////////////////////////////////////U NEED TO CHANGE IT `CAUSE SOME FILE CAN HAVE THIS NAME IN DIRECTORY
+///////// RECIEVE DIRECORY ID AND CHECK AVAILABLE FILES
 func (db *DataBase) UpdateItemName(id int, newName string, typeItem string) error {
 	if typeItem != "directory" {
 		// make request if its file updating
@@ -387,6 +390,18 @@ func (db *DataBase) UpdateItemName(id int, newName string, typeItem string) erro
 	// create new path and update it for all child elements
 	p := strings.Split(directory.Path, "/")
 	return db.UpdatePath(id, strings.Join(p[:len(p) - 2], "/") + "/")
+	
+}
+
+// Function for erasing item
+func (db *DataBase) DeleteItem(id int, directoryId int, typeItem string) error {
+	if typeItem != "directory" {
+		// make request if its file
+		req := fmt.Sprintf("update directories set files = array_remove(files, %d) where id=%d", id, directoryId)
+		return db.makeQuery(req)
+	}
+	req := fmt.Sprintf("update directories set directories = array_remove(directories, %d) where id=%d", id, directoryId)
+	return db.makeQuery(req)
 	
 }
 
