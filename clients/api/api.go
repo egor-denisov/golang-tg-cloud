@@ -36,6 +36,7 @@ func New(db db.DataBase, s storage.Storage) ApiClient {
 	}
 	// Setting route for the router
 	res.router.GET("/directory", res.getDirecoryById)
+	res.router.GET("/fileInfo", res.getFileInfoById)
 	res.router.GET("/file", res.getFileById)
 	res.router.GET("/thumbnail", res.getThumbnailById)
 	res.router.POST("/upload", res.uploadFile)
@@ -71,7 +72,24 @@ func (api *ApiClient) getDirecoryById(context *gin.Context) {
 	setHeaders(context)
 	context.IndentedJSON(http.StatusOK, d)
 }
-
+// Function returns a directory info by id
+func (api *ApiClient) getFileInfoById(context *gin.Context) {
+	// Getting the directory id from request parameters and convert it to a number
+	id, err := strconv.Atoi(context.Query("id"))
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	// Getting data about the directory by id
+	f, err := api.db.GetFileById(id)
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	// Return the directory data object
+	setHeaders(context)
+	context.IndentedJSON(http.StatusOK, f)
+}
 // Function returns a file by id
 func (api *ApiClient) getFileById(context *gin.Context) {
 	// Getting the directory id from request parameters and convert it to a number
@@ -151,11 +169,11 @@ func (api *ApiClient) getThumbnailById(context *gin.Context) {
 func (api *ApiClient) preloader(context *gin.Context) {
 	setHeaders(context)
 }
+
 // Function for uploading new files 
 func (api *ApiClient) uploadFile(context *gin.Context) {
 	setHeaders(context)
 	// Getting uploaded file
-	fmt.Printf("%+v\n", context.Request.Header)
 	_, headers, err := context.Request.FormFile("file")
 	if err != nil {
 		ProccessError(context, err)
@@ -179,9 +197,16 @@ func (api *ApiClient) uploadFile(context *gin.Context) {
 		ProccessError(context, err)
 		return
 	}
+
+	idChannel := make(chan int) 
+	defer close(idChannel)
 	
 	// Adding our data in queue for later adding to telegram server
-	api.storage.AddToUploadingQueue(path, headers.Filename, userId, directoryId)
+	api.storage.AddToUploadingQueue(idChannel, path, headers.Filename, userId, directoryId)
+	// Send response with id for new file
+	id := <- idChannel 
+	context.IndentedJSON(http.StatusOK, gin.H{"id": id})
+	
 }
 
 // Function for getting available files and directories
@@ -228,8 +253,13 @@ func (api *ApiClient) authorization(context *gin.Context) {
 
 // Function for editing the file or directory
 func (api *ApiClient) editItem(context *gin.Context) {
-	// Getting user_id from data
+	// Getting data
 	id, err := strconv.Atoi(context.Query("id"))
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	directoryId, err := strconv.Atoi(context.Query("directory_id"))
 	if err != nil {
 		ProccessError(context, err)
 		return
@@ -239,7 +269,7 @@ func (api *ApiClient) editItem(context *gin.Context) {
 
 	setHeaders(context)
 	// Setting new name
-	if err := api.db.UpdateItemName(id, newName, typeItem); err != nil {
+	if err := api.db.UpdateItemName(id, directoryId, newName, typeItem); err != nil {
 		ProccessError(context, err)
 		return
 	}

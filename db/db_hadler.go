@@ -22,7 +22,7 @@ func (db *DataBase) CreateNewDirectory(directory Directory) (string, error) {
 		return "", fmt.Errorf("wrong folder name")
 	}
 	// Checking existence of folder with current name
-	existence, err := db.FolderExists(int64(directory.UserId), directory.ParentId, directory.Name)
+	existence, err := db.FolderExists(directory.ParentId, directory.Name)
 	if err != nil {
 		return "", err
 	}
@@ -92,10 +92,16 @@ func (db *DataBase) AddFileToDirectory(directoryId int, file File) error {
 	return db.makeQuery(req)
 }
 // Function for checking existence of directory by name
-func (db *DataBase) FolderExists(userId int64, currentDirectoryId int, directoryName string) (bool, error) {
+func (db *DataBase) FolderExists(currentDirectoryId int, directoryName string) (bool, error) {
 	// Getting an array of directory names contained in the current directory
 	currentDirectories, err := db.GetNamesArray(currentDirectoryId, "directories")
 	return h.Contains(currentDirectories, directoryName), err
+}
+// Function for checking existence of directory by name
+func (db *DataBase) FileExists(currentDirectoryId int, fileName string) (bool, error) {
+	// Getting an array of file names contained in the current directory
+	currentFiles, err := db.GetNamesArray(currentDirectoryId, "files")
+	return h.Contains(currentFiles, fileName), err
 }
 // Function for adding a directory into the current directory
 func (db *DataBase) AddNewDirectoryToDirectory(currentDirectoryId int, newDirectoryId int) error {
@@ -302,7 +308,7 @@ func (db *DataBase) GetNamesArray(directoryId int, name string) ([]string, error
 		return nil, nil
 	}
 	// Getting name for each id
-	req = fmt.Sprintf("select name from directories where id in ( %s )", strings.Join(h.IntArrayToStrArray(ids), ", "))
+	req = fmt.Sprintf("select name from %s where id in ( %s )", name, strings.Join(h.IntArrayToStrArray(ids), ", "))
 	rows, err := db.selectRows(req)
 	defer rows.Close()
 	if err != nil {
@@ -364,14 +370,29 @@ func (db *DataBase) GetUserInfo(userId int64) (user User, err error) {
 }
 
 // Function for updating item name
-
-//////////////////////////////////////////////////////////////////U NEED TO CHANGE IT `CAUSE SOME FILE CAN HAVE THIS NAME IN DIRECTORY
-///////// RECIEVE DIRECORY ID AND CHECK AVAILABLE FILES
-func (db *DataBase) UpdateItemName(id int, newName string, typeItem string) error {
+func (db *DataBase) UpdateItemName(id int, directoryId int, newName string, typeItem string) error {
 	if typeItem != "directory" {
+		// Checking existence of folder with current name
+		existence, err := db.FileExists(directoryId, newName)
+		if err != nil {
+			return err
+		}
+		// Return error if directory exists
+		if existence {
+			return fmt.Errorf("file with this name already exists in current folder")
+		}
 		// make request if its file updating
 		req := fmt.Sprintf("update files set name = '%s' where id=%d", newName, id)
 		return db.makeQuery(req)
+	}
+	// Checking existence of folder with current name
+	existence, err := db.FolderExists(directoryId, newName)
+	if err != nil {
+		return err
+	}
+	// Return error if directory exists
+	if existence {
+		return fmt.Errorf("directory with this name already exists in current folder")
 	}
 	// else getting directory info
 	directory, err := db.GetDirectory(id)

@@ -13,6 +13,7 @@ import (
 )
 
 type UploadingItem struct {
+	idChannel chan int
 	path     string
 	filename string
 	user_id     int
@@ -47,9 +48,11 @@ func New(token string, db db.DataBase) Storage {
 func (s *Storage) StartUploading() {
 	// Listen queue channel
 	for item := range s.uploadingQueue {
-		if err := s.UploadFile(item); err != nil {
+		id, err := s.UploadFile(item)
+		if err != nil {
 			log.Print(err)
 		}
+		item.idChannel <- id
 	}
 }
 
@@ -73,20 +76,19 @@ func (s *Storage) GetFileURL(fileId string) (string, error) {
 }
 
 // Function upload a file to the tg server by sending message to user
-func (s *Storage) UploadFile(item UploadingItem) (err error) {
+func (s *Storage) UploadFile(item UploadingItem) (id int, err error) {
 	defer func() { err = e.WrapIfErr("can`t upload file to storage", err) }()
-
 	// Rename unique filename to original
 	newPath := "./assets/" + item.filename
 	if err := os.Rename(item.path, newPath); err != nil {
-		return err
+		return -1, err
 	}
 
 	// Create new instance of document and sending it to user
 	document := tgbotapi.NewDocument(int64(item.user_id), tgbotapi.FilePath(newPath))
 	msg, err := s.bot.Send(document)
 	if err != nil {
-		return err
+		return -1, err
 	}
 	// Create new instance of file
 	thumbnailFileId := ""
@@ -103,23 +105,23 @@ func (s *Storage) UploadFile(item UploadingItem) (err error) {
 	}
 	
 	// Upload file to database
-	file.Id, err = s.db.CreateNewFile(int64(item.user_id), item.directoryId, file)
+	id, err = s.db.CreateNewFile(int64(item.user_id), item.directoryId, file)
 	if err != nil {
-		return err
+		return -1, err
 	}
-
 	// Remove temp file
 	if err := os.Remove(newPath); err != nil {
-		return err
+		return -1, err
 	}
 
-	return err
+	return id, err
 }
 
 // Function for adding new item to queue channel
-func (s *Storage) AddToUploadingQueue(path string, filename string, user_id int, directoryId int) {
+func (s *Storage) AddToUploadingQueue(idChannel chan int, path string, filename string, user_id int, directoryId int) {
 	// Adding new item to queue channel
 	s.uploadingQueue <- UploadingItem{
+		idChannel: idChannel,
 		path: path, 
 		filename: filename, 
 		user_id: user_id,
