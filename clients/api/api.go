@@ -242,13 +242,30 @@ func (api *ApiClient) authorization(context *gin.Context) {
 		ProccessError(context, err)
 		return
 	}
-	userInfo, err := api.db.GetUserInfo(int64(userId))
-	if err != nil {
-		ProccessError(context, err)
-		return
+	var userInfo User
+	if userInfo, err = api.db.GetUserInfo(int64(userId)); err != nil{
+		if err.Error() != "sql: Rows are closed" {
+			ProccessError(context, err)
+			return
+		}
+		info := User{
+			UserId: userId,
+			UserName: context.Query("username"),
+			FirstName: context.Query("first_name"),
+			LastName: context.Query("last_name"),
+		}
+		userInfo, err = api.db.CreateNewUser(info)
+		if err != nil {
+			ProccessError(context, err)
+			return
+		}
 	}
 	setHeaders(context)
-	context.IndentedJSON(http.StatusOK, userInfo)
+	if h.CheckHash(userInfo.Hash, strconv.Itoa(userInfo.UserId), userInfo.UserName, userInfo.FirstName, userInfo.LastName) {
+		context.IndentedJSON(http.StatusOK, userInfo)
+	}else{
+		context.IndentedJSON(http.StatusUnauthorized, "authorization error")
+	}
 }
 
 // Function for editing the file or directory

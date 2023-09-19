@@ -20,6 +20,7 @@ type User struct {
 	FirstName string `json:"firstname"`
 	LastName string `json:"lastname"`
 	CurrentDirectory int `json:"current_directory"`
+	Hash string `json:"hash"`
 }
 
 type Directory struct {

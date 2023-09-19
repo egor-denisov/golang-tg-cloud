@@ -32,5 +32,6 @@ CREATE TABLE users
     UserID integer,
     FirstName varchar(255),
     LastName varchar(255),
-    CurrentDirectory integer REFERENCES directories (Id)
+    CurrentDirectory integer REFERENCES directories (Id),
+    Hash varchar(255)
 );

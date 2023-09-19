@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // Function for checking availability of element in an array
@@ -57,4 +58,21 @@ func ParseIds(jsonBuffer string) ([]int, error) {
 // Function which returns unique name (uuid) for something
 func GenerateUniqueName() string {
 	return uuid.New().String()
+}
+func HashData(data ...string) (string, error) {
+	var s string
+	for _, elem := range data {
+		s += elem
+	}
+    bytes, err := bcrypt.GenerateFromPassword([]byte(s), 14)
+    return string(bytes), err
+}
+
+func CheckHash(hash string, data ...string) bool {
+	var s string
+	for _, elem := range data {
+		s += elem
+	}
+    err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(s))
+    return err == nil
 }

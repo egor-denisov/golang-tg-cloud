@@ -129,28 +129,44 @@ func (db *DataBase) GetParentDirectory(directoryId int) (Directory, error) {
 	return db.GetDirectory(currentDirectory.ParentId)
 }
 // Function for creating a new user
-func (db *DataBase) CreateNewUser(user User) (string, error) {
+func (db *DataBase) CreateNewUser(user User) (User, error) {
+	var u User
 	// Checking existence of this userId
-	exist, err := db.UserExists(int64(user.UserId))
+	exist, err := db.UserExists(int64(user.UserId), user.UserName)
 	if err != nil {
-		return "", err
+		return u, err
 	}
 	// If user exists then error is returned
 	if exist {
-		return "", errors.New("user already exists")
+		return u, errors.New("user already exists")
 	}
 	// Creating a root directory for user
-	directoryId, err := db.CreateRootDirectory(Directory{Name : "(root)/", UserId: user.UserId})
+	currentDirectoryStr, err := db.CreateRootDirectory(Directory{Name : "(root)/", UserId: user.UserId})
 	if err != nil {
-		return "", err
+		return u, err
+	}
+	user.CurrentDirectory, err = strconv.Atoi(currentDirectoryStr)
+	if err != nil {
+		return u, err
+	}
+	// Creating hash for user
+	user.Hash, err = h.HashData(strconv.Itoa(user.UserId), user.UserName, user.FirstName, user.LastName)
+	if err != nil {
+		return u, err
 	}
 	// Inserting a new user into the database
-	return db.insert("insert into users (Username, UserID, FirstName, LastName, CurrentDirectory) values ($1, $2, $3, $4, $5) returning Id", 
-		user.UserName, user.UserId, user.FirstName, user.LastName, directoryId)
+	idStr, err :=  db.insert("insert into users (Username, UserID, FirstName, LastName, CurrentDirectory, Hash) values ($1, $2, $3, $4, $5, $6) returning id", 
+		user.UserName, user.UserId, user.FirstName, user.LastName, user.CurrentDirectory, user.Hash)
+	if err != nil {
+		return u, err
+	}
+	user.Id, err = strconv.Atoi(idStr)
+
+	return user, err
 }
 // Function for checking existence of user by userId
-func (db *DataBase) UserExists(userId int64) (bool, error) {
-	req := fmt.Sprintf("select id from users where userId = %d", userId)
+func (db *DataBase) UserExists(userId int64, username string) (bool, error) {
+	req := fmt.Sprintf("select id from users where userId = %d or username = '%s'", userId, username)
 	id, err := db.selectRow(req)
 	return id != "", err
 }
@@ -365,8 +381,14 @@ func (db *DataBase) GetUserInfo(userId int64) (user User, err error) {
 	}
 	rows.Next()
 	// Setting data into user instance
-	err = rows.Scan(&u.Id, &u.UserName, &u.UserId, &u.FirstName, &u.LastName, &u.CurrentDirectory)
+	err = rows.Scan(&u.Id, &u.UserName, &u.UserId, &u.FirstName, &u.LastName, &u.CurrentDirectory, &u.Hash)
 	return u, err
+}
+
+// Getting user data from database
+func (db *DataBase) GetUserHash(userId int64) (hash string, err error) {
+	req := fmt.Sprintf("select hash from users where UserID = %d", userId)
+	return db.selectRow(req)
 }
 
 // Function for updating item name
