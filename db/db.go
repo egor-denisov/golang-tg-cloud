@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"io/ioutil"
 	env "main/environment"
 	"main/lib/e"
 
@@ -19,14 +20,22 @@ func (db *DataBase) Get() *sql.DB{
 // Creating new instance of database
 func New() (DataBase, error) {
 	// Create request string for connection
-	psqlconn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", 
+	psqlconn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", 
 		env.HOST, env.PORT, env.USER, env.PASSWORD, env.DBNAME)
 	// Connecting to database
 	db, err := sql.Open("postgres", psqlconn)
 	if err != nil {
         return DataBase{}, e.WrapIfErr("can`t create instance of database", err)
     }
-	
+	// Creating tables if it doesn't exist
+	c, err := ioutil.ReadFile("./sql/query.sql")
+	if err != nil {
+		return DataBase{}, err
+	}
+	sql := string(c)
+	if _, err := db.Exec(sql); err != nil {
+		return DataBase{}, err
+	}
 	return DataBase{database: db}, nil
 }
 // Closing database

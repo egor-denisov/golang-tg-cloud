@@ -1,17 +1,24 @@
 package env
 
+import "os"
+
 // Database environment variables
-const (
-	HOST     = "localhost"
-	PORT     = 5432
-	USER     = "postgres"
-	PASSWORD = "admin"
-	DBNAME   = "cloud"
+var (
+	HOST     = os.Getenv("DB_HOST")
+	PORT     = os.Getenv("DB_PORT")
+	USER     = os.Getenv("DB_USER")
+	PASSWORD = os.Getenv("DB_PASSWORD")
+	DBNAME   = os.Getenv("DB_NAME")
 )
 
 // Telegram tokens
-const BOT_TOKEN = "5837544572:AAHEKX1XvXphaee-TfJpV60hgHAtngQW-EE"
-const STORAGE_TOKEN = "5837544572:AAHEKX1XvXphaee-TfJpV60hgHAtngQW-EE"
+var BOT_TOKEN = os.Getenv("TG_BOT_TOKEN")
 
-const API_ID int32 = 7753607
-const API_HASH = "8b21401fb398a78bf09ccd1e2322d675"
+func SetEnvironment() {
+	HOST     = os.Getenv("DB_HOST")
+	PORT     = os.Getenv("DB_PORT")
+	USER     = os.Getenv("DB_USER")
+	PASSWORD = os.Getenv("DB_PASSWORD")
+	DBNAME   = os.Getenv("DB_NAME")
+	BOT_TOKEN = os.Getenv("TG_BOT_TOKEN")
+}

@@ -1,4 +1,4 @@
-CREATE TABLE files
+CREATE TABLE IF NOT EXISTS files
 (
    	Id serial PRIMARY KEY,
     Name varchar(255),
@@ -12,7 +12,7 @@ CREATE TABLE files
     FileSource varchar(255) DEFAULT ''
 );
 
-CREATE TABLE directories
+CREATE TABLE IF NOT EXISTS directories
 (
    	Id serial PRIMARY KEY,
     ParentId integer DEFAULT -1,
@@ -25,7 +25,7 @@ CREATE TABLE directories
     Created timestamp
 );
 
-CREATE TABLE users
+CREATE TABLE IF NOT EXISTS users
 (
    	Id serial PRIMARY KEY,
     Username varchar(255),
