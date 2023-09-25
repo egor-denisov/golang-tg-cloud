@@ -14,6 +14,7 @@ var (
 // Telegram tokens
 var BOT_TOKEN = os.Getenv("TG_BOT_TOKEN")
 
+// Function for setting environment variables
 func SetEnvironment() {
 	HOST     = os.Getenv("DB_HOST")
 	PORT     = os.Getenv("DB_PORT")
