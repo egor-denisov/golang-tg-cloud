@@ -21,8 +21,8 @@
 go.work
 
 # evnironment file
-env.go
 .env
 
 # assets directory
 /assets
+.vercel
