@@ -83,7 +83,7 @@ func (s *Storage) UploadFile(item UploadingItem) (id int, err error) {
 	if err := os.Rename(item.path, newPath); err != nil {
 		return -1, err
 	}
-
+	defer func () { err = os.Remove(newPath) }()
 	// Create new instance of document and sending it to user
 	document := tgbotapi.NewDocument(int64(item.user_id), tgbotapi.FilePath(newPath))
 	msg, err := s.bot.Send(document)
@@ -103,10 +103,7 @@ func (s *Storage) UploadFile(item UploadingItem) (id int, err error) {
 		ThumbnailFileId: thumbnailFileId,
 		FileType: msg.Document.MimeType,
 	}
-	// Remove temp file
-	if err := os.Remove(newPath); err != nil {
-		return -1, err
-	}
+	
 	// Upload file to database
 	id, err = s.db.CreateNewFile(int64(item.user_id), item.directoryId, file)
 	if err != nil {
