@@ -16,17 +16,16 @@ The project was launched in July 2023 and is still in development.
 - [Running the project](https://github.com/egor-denisov/golang-tg-cloud#running-the-project)
 - [API Reference](https://github.com/egor-denisov/golang-tg-cloud#api-reference)
 - [About the app](https://github.com/egor-denisov/golang-tg-cloud#about-the-app)
-- [Features](https://github.com/egor-denisov/golang-tg-cloud#features)
 - [Dependencies](https://github.com/egor-denisov/golang-tg-cloud#dependencies)
 - [Credits](https://github.com/egor-denisov/golang-tg-cloud#credits)
 
 ## Live Demo
 Live demo is available here: 
 - [Telegram bot](https://t.me/StorageTest1Bot);
-- Web version [currently unavailable].
+- [Web version](https://web-tg-cloud.vercel.app/).
 ## Final product
 
-At the moment, the project is under development. Now some features of the api of the service and Telegram bot are available for operation. To visualize the possibilities, a frontend is being developed on react.js
+At the moment, the project is under development. Now some features of the api of the service and Telegram bot are available for operation. A minimal web interface on react has been developed and deployed.
 
 #### Examples of bot work
 
@@ -37,23 +36,37 @@ At the moment, the project is under development. Now some features of the api of
 </div>
 
 
+#### Examples of web version work
+
+- Login page:
+![](https://sun9-33.userapi.com/impg/yxXvwaBgQKcgmni529yaqQEiH9FxQYdHUcE2Lg/7XhlsR535fg.jpg?size=1920x1033&quality=95&sign=fdac6be833147511ee3fda94296dd916&type=album "Login page")
+
+- Folder content:
+![](https://sun9-62.userapi.com/impg/iFgJut9DmHAZypvpTMN6hfCYS0kgnNXcUp2LuQ/x7wzbDpgoCI.jpg?size=1920x1033&quality=95&sign=64e29b9a9595d35e27d52b94bcfce334&type=album "Folder content")
+
+- Preview:
+![](https://sun9-12.userapi.com/impg/UT3ItuiT8AzmX1eukm91QWYDEy5Z132XLfBIbA/JQl26RdJ_xs.jpg?size=1920x1033&quality=95&sign=d04586815e73872cdeb8df8d9ced4ac1&type=album "Preview")
+
+- Deleting file:
+![](https://sun9-22.userapi.com/impg/XSYD0x1HVCaW0m28EhpK8FTEJL7bfzbpLOonKg/gH1rGwm9zKk.jpg?size=1920x1033&quality=95&sign=5961ba1aaad2674e8d1a460965789c08&type=album "Deleting file")
+
+- Uploading files:
+![](https://sun9-72.userapi.com/impg/okfS5Br5cVIgm_yrP0FoPbjDRM5xwWdYK_y3jQ/LdMrYY0y18I.jpg?size=1920x1033&quality=95&sign=22ec5b64234498ddf96a5ac7b3dcf8f5&type=album")
+
 ## Running the project
 1) For starting Telegram version you need get token from https://t.me/BotFather. 
-2) To run this project, you will need to add the following environment variables to your ***environment/env.go*** file:
+2) To run this project, you will need to add the following environment variables to your ***.env*** file:
 
-`BOT_TOKEN` - Telegram token from BotFather
+`TG_BOT_TOKEN` - Telegram token from BotFather
 
-`STORAGE_TOKEN` - You can use the same token for this variable.
+`DB_HOST` `DB_PORT` `DB_USER` `DB_PASSWORD` `DB_NAME` - Database variables.
 
-`HOST` `PORT` `USER` `PASSWORD` `DBNAME` - Database variables.
-
-3) To create necessary tables, in your PostgreSQL database run commands from ***sql/query.sql***.
-4) Finally, in cmd run this command:
+3) Finally, in cmd run this command:
 
 ```
-go build
+go run main.go
 ```
-Аfter executing, you can run main.exe file and write /start to your bot. Also you can build client server.
+Аfter executing, you can write /start to your bot. Also you can build client server with a user-friendly interface.
 
 
 ## API Reference
@@ -62,6 +75,16 @@ go build
 
 ```http
   GET /directory
+```
+
+| Parameter | Type     | Description                |
+| :-------- | :------- | :------------------------- |
+| `id` | `number` | **Required**. Directory ID |
+
+#### Get info about file
+
+```http
+  GET /fileInfo
 ```
 
 | Parameter | Type     | Description                |
@@ -99,6 +122,42 @@ go build
 | `user_id` | `number` | **Required**. Telegram user_id |
 | `directory_id` | `number` | **Required**. Directory ID |
 
+#### Authorization in the system
+
+```http
+  GET /auth
+```
+
+| Parameter | Type     | Description                       |
+| :-------- | :------- | :-------------------------------- |
+| `user_id` | `number` | **Required**. Telegram user_id |
+| `username` | `string` | Telegram username |
+| `first_name` | `string` | Telegram first name |
+| `last_name` | `string` | Telegram lsat name |
+
+#### Create new directory
+
+```http
+  GET /createDirectory
+```
+
+| Parameter | Type     | Description                       |
+| :-------- | :------- | :-------------------------------- |
+| `parent_id` | `number` | **Required**. Id of parent directory |
+| `name` | `string` | **Required**. Name of a new directory |
+| `user_id` | `number` | **Required**. Telegram user_id |
+
+#### Delete item
+
+```http
+  GET /delete
+```
+
+| Parameter | Type     | Description                       |
+| :-------- | :------- | :-------------------------------- |
+| `id` | `number` | **Required**. Item id for deleting |
+| `directory_id` | `number` | **Required**. Directory ID |
+| `type` | `"file" | "directory"` | **Required**. Type item for deleting |
 #### Upload file to cloud
 
 ```http
@@ -118,14 +177,6 @@ This application is designed to save small files without restrictions on the amo
 
 The backend of the application is written in golang, used by postgres as a database. A frontend is currently being developed on react.js. In the future, a utility will be written to download larger files.
 
-## Features
-
-This paragraph contains some of the features of this project:
-
-- Сlient synchronization (telegram bot and web version)
-- Lack of permanent data storage due to the use of Telegram servers
-- Api client that allows you to conveniently access the database
-
 ## Dependencies
 - Golang v1.20
 - PostgreSQL v15.1
@@ -135,3 +186,5 @@ This paragraph contains some of the features of this project:
 - [postgres](https://github.com/lib/pq)
 - [gin](https://github.com/gin-gonic/gin)
 - [uuid](https://github.com/google/uuid)
+- Backend deployed on [qovery.com](https://qovery.com)
+- Database deployed on [clever-cloud.com](https://www.clever-cloud.com/)
