@@ -214,12 +214,6 @@ func (api *ApiClient) uploadFile(context *gin.Context) {
 		ProccessError(context, err)
 		return
 	}
-	// Saving file in temp storage
-	path := "./assets/" + h.GenerateUniqueName()
-	if err := context.SaveUploadedFile(headers, path); err != nil {
-		ProccessError(context, err)
-		return
-	}
 	// Getting user id
 	userId, err := strconv.Atoi(context.PostForm("user_id"))
 	if err != nil {
@@ -241,6 +235,12 @@ func (api *ApiClient) uploadFile(context *gin.Context) {
 	idChannel := make(chan int) 
 	defer close(idChannel)
 	
+	// Saving file in temp storage
+	path := "./assets/" + h.GenerateUniqueName()
+	if err := context.SaveUploadedFile(headers, path); err != nil {
+		ProccessError(context, err)
+		return
+	}
 	// Adding our data in queue for later adding to telegram server
 	api.storage.AddToUploadingQueue(idChannel, path, headers.Filename, userId, directoryId)
 	// Send response with id for new file

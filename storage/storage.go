@@ -103,14 +103,13 @@ func (s *Storage) UploadFile(item UploadingItem) (id int, err error) {
 		ThumbnailFileId: thumbnailFileId,
 		FileType: msg.Document.MimeType,
 	}
-	
+	// Remove temp file
+	if err := os.Remove(newPath); err != nil {
+		return -1, err
+	}
 	// Upload file to database
 	id, err = s.db.CreateNewFile(int64(item.user_id), item.directoryId, file)
 	if err != nil {
-		return -1, err
-	}
-	// Remove temp file
-	if err := os.Remove(newPath); err != nil {
 		return -1, err
 	}
 
