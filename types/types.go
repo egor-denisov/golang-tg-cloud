@@ -37,6 +37,7 @@ type Directory struct {
 
 type File struct {
 	Id int `json:"id"`
+	UserId int `json:"user_id"`
 	Name string `json:"name"`
 	FileId string `json:"file_id"`
 	FileUniqueId string `json:"file_unique_id"`

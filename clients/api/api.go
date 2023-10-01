@@ -68,20 +68,35 @@ func (api *ApiClient) getDirecoryById(context *gin.Context) {
 		ProccessError(context, err)
 		return
 	}
+	// Checking user hash
+	if err := api.db.CheckHash(d.UserId, context.Query("hash")); err != nil {
+		ProccessError(context, err)
+		return
+	}
 	// Return the directory data object
 	setHeaders(context)
 	context.IndentedJSON(http.StatusOK, d)
 }
 // Function returns a directory info by id
 func (api *ApiClient) getFileInfoById(context *gin.Context) {
-	// Getting the directory id from request parameters and convert it to a number
+	// Getting the file id and user id from request parameters and convert it to a number
 	id, err := strconv.Atoi(context.Query("id"))
 	if err != nil {
 		ProccessError(context, err)
 		return
 	}
+	userId, err := strconv.Atoi(context.Query("user_id"))
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	// Checking user hash
+	if err := api.db.CheckHash(userId, context.Query("hash")); err != nil {
+		ProccessError(context, err)
+		return
+	}
 	// Getting data about the directory by id
-	f, err := api.db.GetFileById(id)
+	f, err := api.db.GetFileById(int64(userId), id, false)
 	if err != nil {
 		ProccessError(context, err)
 		return
@@ -92,14 +107,24 @@ func (api *ApiClient) getFileInfoById(context *gin.Context) {
 }
 // Function returns a file by id
 func (api *ApiClient) getFileById(context *gin.Context) {
-	// Getting the directory id from request parameters and convert it to a number
+	// Getting the file id and user id from request parameters and convert it to a number
 	id, err := strconv.Atoi(context.Query("id"))
 	if err != nil {
 		ProccessError(context, err)
 		return
 	}
+	userId, err := strconv.Atoi(context.Query("user_id"))
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	// Checking user hash
+	if err := api.db.CheckHash(userId, context.Query("hash")); err != nil {
+		ProccessError(context, err)
+		return
+	}
 	// Getting data about the file by id
-	fileData, err := api.db.GetFileById(id)
+	fileData, err := api.db.GetFileById(int64(userId), id, false)
 	if err != nil {
 		ProccessError(context, err)
 		return
@@ -130,14 +155,24 @@ func (api *ApiClient) getFileById(context *gin.Context) {
 
 // Function returns a thumbnail by id
 func (api *ApiClient) getThumbnailById(context *gin.Context) {
-	// Getting the directory id from request parameters and convert it to a number
+	// Getting the file id and user id from request parameters and convert it to a number
 	id, err := strconv.Atoi(context.Query("id"))
 	if err != nil {
 		ProccessError(context, err)
 		return
 	}
+	userId, err := strconv.Atoi(context.Query("user_id"))
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	// Checking user hash
+	if err := api.db.CheckHash(userId, context.Query("hash")); err != nil {
+		ProccessError(context, err)
+		return
+	}
 	// Getting data about the file by id
-	fileData, err := api.db.GetFileById(id)
+	fileData, err := api.db.GetFileById(int64(userId), id, false)
 	if err != nil {
 		ProccessError(context, err)
 		return
@@ -191,6 +226,11 @@ func (api *ApiClient) uploadFile(context *gin.Context) {
 		ProccessError(context, err)
 		return
 	}
+	// Checking user hash
+	if err := api.db.CheckHash(userId, context.PostForm("hash")); err != nil {
+		ProccessError(context, err)
+		return
+	}
 	// Getting directory id
 	directoryId, err := strconv.Atoi(context.PostForm("directory_id"))
 	if err != nil {
@@ -214,6 +254,11 @@ func (api *ApiClient) getAvailableItems(context *gin.Context) {
 	// Getting the user id from request parameters and convert it to a number
 	userId, err := strconv.Atoi(context.Query("user_id"))
 	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	// Checking user hash
+	if err := api.db.CheckHash(userId, context.Query("hash")); err != nil {
 		ProccessError(context, err)
 		return
 	}
@@ -271,6 +316,16 @@ func (api *ApiClient) authorization(context *gin.Context) {
 // Function for editing the file or directory
 func (api *ApiClient) editItem(context *gin.Context) {
 	// Getting data
+	userId, err := strconv.Atoi(context.Query("user_id"))
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	// Checking user hash
+	if err := api.db.CheckHash(userId, context.Query("hash")); err != nil {
+		ProccessError(context, err)
+		return
+	}
 	id, err := strconv.Atoi(context.Query("id"))
 	if err != nil {
 		ProccessError(context, err)
@@ -286,17 +341,23 @@ func (api *ApiClient) editItem(context *gin.Context) {
 
 	setHeaders(context)
 	// Setting new name
-	if err := api.db.UpdateItemName(id, directoryId, newName, typeItem); err != nil {
+	if err := api.db.UpdateItemName(userId, id, directoryId, newName, typeItem); err != nil {
 		ProccessError(context, err)
 		return
 	}
+	context.IndentedJSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
 // Function for creating directory
 func (api *ApiClient) createDirectory(context *gin.Context) {
-	// Getting the directory id from request parameters and convert it to a number
+	// Getting the directory info from request parameters and convert it to a number
 	var directoryInfo Directory
 	if err := json.Unmarshal([]byte(context.Query("directory")), &directoryInfo); err != nil {
+		ProccessError(context, err)
+		return
+	}
+	// Checking user hash
+	if err := api.db.CheckHash(directoryInfo.UserId, context.Query("hash")); err != nil {
 		ProccessError(context, err)
 		return
 	}
@@ -312,9 +373,19 @@ func (api *ApiClient) createDirectory(context *gin.Context) {
 
 // Function for erasing the file or directory
 func (api *ApiClient) deleteItem(context *gin.Context) {
-	// Getting user_id from data
+	// Getting user_id and id from data
 	id, err := strconv.Atoi(context.Query("id"))
 	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	userId, err := strconv.Atoi(context.Query("user_id"))
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	// Checking user hash
+	if err := api.db.CheckHash(userId, context.Query("hash")); err != nil {
 		ProccessError(context, err)
 		return
 	}
@@ -326,11 +397,12 @@ func (api *ApiClient) deleteItem(context *gin.Context) {
 	typeItem := context.Query("type")
 
 	setHeaders(context)
-	// Setting new name
-	if err := api.db.DeleteItem(id, directoryId, typeItem); err != nil {
+	// Deleting the item
+	if err := api.db.DeleteItem(id, userId, directoryId, typeItem); err != nil {
 		ProccessError(context, err)
 		return
 	}
+	context.IndentedJSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
 // Function for proccessing errors in working of api
@@ -346,10 +418,13 @@ func ProccessError(context *gin.Context, err error) {
 		context.IndentedJSON(http.StatusNotAcceptable, "Directory with this name already exists in current folder")
 	case "wrong folder name":
 		context.IndentedJSON(http.StatusNotAcceptable, "Directory name is uncorrectly. Don`t use symbols: <, >, :, «, /,\\ , |, ?, *")
+	case "can`t make query":
+		context.IndentedJSON(http.StatusNotAcceptable, "You can`t make this request")
+	case "can`t upload file to storage":
+		context.IndentedJSON(http.StatusNotAcceptable, "File with this name already in directory")
 	default: 
 		context.IndentedJSON(http.StatusInternalServerError, err.Error())
 	}
-	
 }
 // Function for creating headers
 func setHeaders(context *gin.Context) {

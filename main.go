@@ -40,7 +40,7 @@ func main() {
 	go apiClient.Listen()
 
 	// Create channel for infinite work
-	exit := make(chan interface{})
+	exit := make(chan struct{})
 	<-exit
 	defer close(exit)
 }

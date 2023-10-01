@@ -22,7 +22,7 @@ func (db *DataBase) CreateNewDirectory(directory Directory) (string, error) {
 		return "", fmt.Errorf("wrong folder name")
 	}
 	// Checking existence of folder with current name
-	existence, err := db.FolderExists(directory.ParentId, directory.Name)
+	existence, err := db.FolderExists(directory.UserId, directory.ParentId, directory.Name)
 	if err != nil {
 		return "", err
 	}
@@ -51,6 +51,15 @@ func (db *DataBase) CreateNewDirectory(directory Directory) (string, error) {
 }
 // Function for creating a new file
 func (db *DataBase) CreateNewFile(userId int64, directoryId int, file File) (int, error) {
+	file.UserId = int(userId)
+	// Checking containing file in directory
+	exists, err := db.FileExists(file.UserId, directoryId, file.Name)
+	if err != nil {
+		return -1, err
+	}
+	if exists {
+		return -1, fmt.Errorf("file already exists in folder")
+	}
 	// Getting id by unique id
 	id, err := db.GetIdOfFileByUniqueId(file.FileUniqueId)
 	if err != nil {
@@ -58,29 +67,24 @@ func (db *DataBase) CreateNewFile(userId int64, directoryId int, file File) (int
 	}
 	// If file already exists then error is returned 
 	if id > 0 {
-		file.Id = id
-		// Getting files id`s from directory
-		currentFiles, err := db.GetIdsArray(directoryId, "files")
+		// Getting source from similar file
+		fileInfo, err := db.GetFileById(userId, id, true);
 		if err != nil {
 			return -1, err
 		}
-		// Checking containing file in directory
-		if h.Contains(currentFiles, file.Id) {
-			return -1, fmt.Errorf("file already exists in folder")
-		}
-	}else{
-		// Inserting file into database
-		idStr, err := db.insert("insert into files (Name, FileId, FileUniqueId, FileType, Created, FileSize, ThumbnailFileId) values ($1, $2, $3, $4, now(), $5, $6) returning Id", 
-				file.Name, file.FileId, file.FileUniqueId, file.FileType, file.FileSize, file.ThumbnailFileId)
-		
-		if err != nil {
-			return -1, err
-		}
-		// Converting id to integer
-		file.Id, err = strconv.Atoi(idStr)
-		if err != nil {
-			return -1, err
-		}
+		file.FileSource = fileInfo.FileSource
+		file.ThumbnailSource = fileInfo.ThumbnailSource
+	}
+	// Inserting file into database
+	idStr, err := db.insert("insert into files (userId, Name, FileId, FileUniqueId, FileType, Created, FileSize, ThumbnailFileId, FileSource, ThumbnailSource) values ($1, $2, $3, $4, $5, now(), $6, $7, $8, $9) returning Id", 
+		file.UserId, file.Name, file.FileId, file.FileUniqueId, file.FileType, file.FileSize, file.ThumbnailFileId, file.FileSource, file.ThumbnailSource)
+	if err != nil {
+		return -1, err
+	}
+	// Converting id to integer
+	file.Id, err = strconv.Atoi(idStr)
+	if err != nil {
+		return -1, err
 	}
 	// Returning file id and result of adding file to directory
 	return file.Id, db.AddFileToDirectory(directoryId, file)
@@ -92,15 +96,15 @@ func (db *DataBase) AddFileToDirectory(directoryId int, file File) error {
 	return db.makeQuery(req)
 }
 // Function for checking existence of directory by name
-func (db *DataBase) FolderExists(currentDirectoryId int, directoryName string) (bool, error) {
+func (db *DataBase) FolderExists(userId int, currentDirectoryId int, directoryName string) (bool, error) {
 	// Getting an array of directory names contained in the current directory
-	currentDirectories, err := db.GetNamesArray(currentDirectoryId, "directories")
+	currentDirectories, err := db.GetNamesArray(userId, currentDirectoryId, "directories")
 	return h.Contains(currentDirectories, directoryName), err
 }
 // Function for checking existence of directory by name
-func (db *DataBase) FileExists(currentDirectoryId int, fileName string) (bool, error) {
+func (db *DataBase) FileExists(userId int, currentDirectoryId int, fileName string) (bool, error) {
 	// Getting an array of file names contained in the current directory
-	currentFiles, err := db.GetNamesArray(currentDirectoryId, "files")
+	currentFiles, err := db.GetNamesArray(userId, currentDirectoryId, "files")
 	return h.Contains(currentFiles, fileName), err
 }
 // Function for adding a directory into the current directory
@@ -224,9 +228,14 @@ func (db *DataBase) GetDirectory(id int) (Directory, error) {
 	return d, err
 }
 // Function for getting the file information by id
-func (db *DataBase) GetFileById(id int) (File, error) {
+func (db *DataBase) GetFileById(userId int64, id int, unsafe bool) (File, error) {
 	f := File{}
-	req := fmt.Sprintf("select * from files where id = %d", id)
+	req := ""
+	if unsafe {
+		req = fmt.Sprintf("select * from files where id = %d", id)
+	}else{
+		req = fmt.Sprintf("select * from files where id = %d and userId = %d", id, userId)
+	}
 	rows, err := db.selectRows(req)
 	defer rows.Close()
 	if err != nil {
@@ -234,7 +243,7 @@ func (db *DataBase) GetFileById(id int) (File, error) {
 	}
 	rows.Next()
 	// Setting data into directory instance
-	err = rows.Scan(&f.Id, &f.Name, &f.FileId, &f.FileUniqueId, &f.FileSize, &f.FileType, &f.Created, &f.ThumbnailFileId, &f.ThumbnailSource, &f.FileSource)
+	err = rows.Scan(&f.Id, &f.UserId, &f.Name, &f.FileId, &f.FileUniqueId, &f.FileSize, &f.FileType, &f.Created, &f.ThumbnailFileId, &f.ThumbnailSource, &f.FileSource)
 	return f, err
 }
 // Function for getting available directories in directory
@@ -273,7 +282,7 @@ func (db *DataBase) GetAvailableFilesInDiretory(userId int64, directoryId int) (
 	}
 	// Iterating through directory ids and getting the files inforamation
 	for _, id := range arr {
-		d, err := db.GetFileById(id)
+		d, err := db.GetFileById(userId, id, false)
 		if err != nil {
 			return res, err
 		}
@@ -308,8 +317,8 @@ func (db *DataBase) GetIdsArray(directoryId int, name string) ([]int, error) {
 	return h.ParseIds(idsStr)
 }
 // Function for getting array of id`s ("files"/"directories" - parameter 'name') from directory
-func (db *DataBase) GetNamesArray(directoryId int, name string) ([]string, error) {
-	req := fmt.Sprintf("select %s from directories where id = %d", name, directoryId)
+func (db *DataBase) GetNamesArray(userId int, directoryId int, name string) ([]string, error) {
+	req := fmt.Sprintf("select %s from directories where id = %d and userId = %d", name, directoryId, userId)
 	idsStr, err := db.selectRow(req)
 	if err != nil {
 		return nil, err
@@ -392,10 +401,10 @@ func (db *DataBase) GetUserHash(userId int64) (hash string, err error) {
 }
 
 // Function for updating item name
-func (db *DataBase) UpdateItemName(id int, directoryId int, newName string, typeItem string) error {
+func (db *DataBase) UpdateItemName(userId int, id int, directoryId int, newName string, typeItem string) error {
 	if typeItem != "directory" {
 		// Checking existence of folder with current name
-		existence, err := db.FileExists(directoryId, newName)
+		existence, err := db.FileExists(userId, directoryId, newName)
 		if err != nil {
 			return err
 		}
@@ -404,11 +413,11 @@ func (db *DataBase) UpdateItemName(id int, directoryId int, newName string, type
 			return fmt.Errorf("file with this name already exists in current folder")
 		}
 		// make request if its file updating
-		req := fmt.Sprintf("update files set name = '%s' where id=%d", newName, id)
+		req := fmt.Sprintf("update files set name = '%s' where id=%d and userId=%d", newName, id, userId)
 		return db.makeQuery(req)
 	}
 	// Checking existence of folder with current name
-	existence, err := db.FolderExists(directoryId, newName)
+	existence, err := db.FolderExists(userId, directoryId, newName)
 	if err != nil {
 		return err
 	}
@@ -426,7 +435,7 @@ func (db *DataBase) UpdateItemName(id int, directoryId int, newName string, type
 		return fmt.Errorf("you cannot rename a root directory")
 	}
 	// make directory updating request
-	req := fmt.Sprintf("update directories set name = '%s' where id=%d", newName, id)
+	req := fmt.Sprintf("update directories set name = '%s' where id=%d and userId=%d", newName, id, userId)
 	if err := db.makeQuery(req); err != nil {
 		return err
 	}
@@ -437,13 +446,13 @@ func (db *DataBase) UpdateItemName(id int, directoryId int, newName string, type
 }
 
 // Function for erasing item
-func (db *DataBase) DeleteItem(id int, directoryId int, typeItem string) error {
+func (db *DataBase) DeleteItem(id int, userId int, directoryId int, typeItem string) error {
 	if typeItem != "directory" {
 		// make request if its file
-		req := fmt.Sprintf("update directories set files = array_remove(files, %d) where id=%d", id, directoryId)
+		req := fmt.Sprintf("update directories set files = array_remove(files, %d) where id=%d and userId=%d", id, directoryId, userId)
 		return db.makeQuery(req)
 	}
-	req := fmt.Sprintf("update directories set directories = array_remove(directories, %d) where id=%d", id, directoryId)
+	req := fmt.Sprintf("update directories set directories = array_remove(directories, %d) where id=%d and userId=%d", id, directoryId, userId)
 	return db.makeQuery(req)
 	
 }
@@ -460,7 +469,6 @@ func (db *DataBase) UpdatePath(id int, path string) error {
 	if err := rows.Scan(&newPath, &directoriesStr); err != nil {
 		return err
 	}
-	fmt.Print(newPath, directoriesStr)
 	directories, err := h.ParseIds(directoriesStr);
 	if err != nil {
 		return err
@@ -470,6 +478,18 @@ func (db *DataBase) UpdatePath(id int, path string) error {
 		if err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// Function for checking hash
+func (db *DataBase) CheckHash(userId int, hash string) (error) {
+	userHash, err := db.GetUserHash(int64(userId))
+	if err != nil {
+		return err
+	}
+	if userHash != hash {
+		return fmt.Errorf("hash mismatch")
 	}
 	return nil
 }

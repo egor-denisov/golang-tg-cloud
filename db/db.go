@@ -63,8 +63,19 @@ func (db *DataBase) selectRows(req string) (*sql.Rows, error) {
 	return db.database.Query(req)
 }
 // Executing some query, which one don`t expect response
-func (db *DataBase) makeQuery(req string) error {
+func (db *DataBase) makeQuery(req string) (err error) {
+	defer func() { err = e.WrapIfErr("can`t make query", err) }()
 	// Making a query
-	_, err := db.database.Exec(req)
-	return e.WrapIfErr("can`t make query", err)
+	res, err := db.database.Exec(req)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n < 1 {
+		return fmt.Errorf("0 rows affected")
+	}
+	return nil
 }

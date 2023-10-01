@@ -1,6 +1,7 @@
 CREATE TABLE IF NOT EXISTS files
 (
    	Id serial PRIMARY KEY,
+    UserID integer,
     Name varchar(255),
     FileId varchar(255),
     FileUniqueId varchar(255),

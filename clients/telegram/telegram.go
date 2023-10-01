@@ -87,6 +87,7 @@ func (cl *TgClient) proccessFile(msg *tgbotapi.Message) error {
 			FileId: msg.Document.FileID,
 			FileUniqueId: msg.Document.FileUniqueID,
 			FileSize: msg.Document.FileSize,
+			ThumbnailFileId: msg.Document.Thumbnail.FileID,
 			FileType: msg.Document.MimeType,
 		}
 	}
