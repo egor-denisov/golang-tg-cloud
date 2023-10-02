@@ -47,6 +47,8 @@ type File struct {
 	ThumbnailFileId string `json:"thumbnail_file_id"`
 	ThumbnailSource string `json:"thumbnail_source"`
 	FileSource string `json:"file_source"`
+	SharedId string `json:"shared_id"`
+	IsShared bool `json:"is_shared"`
 }
 
 type DirectoryContent struct {

@@ -10,7 +10,9 @@ CREATE TABLE IF NOT EXISTS files
     Created timestamp,
     ThumbnailFileId varchar(255) DEFAULT '',
     ThumbnailSource varchar(255) DEFAULT '',
-    FileSource varchar(255) DEFAULT ''
+    FileSource varchar(255) DEFAULT '',
+    SharedId varchar(255) NOT NULL DEFAULT gen_random_uuid(),
+    IsShared bool DEFAULT false
 );
 
 CREATE TABLE IF NOT EXISTS directories

@@ -3,7 +3,6 @@ package db
 import (
 	"errors"
 	"fmt"
-	"log"
 	"main/lib/h"
 	. "main/types"
 	"strconv"
@@ -243,7 +242,7 @@ func (db *DataBase) GetFileById(userId int64, id int, unsafe bool) (File, error)
 	}
 	rows.Next()
 	// Setting data into directory instance
-	err = rows.Scan(&f.Id, &f.UserId, &f.Name, &f.FileId, &f.FileUniqueId, &f.FileSize, &f.FileType, &f.Created, &f.ThumbnailFileId, &f.ThumbnailSource, &f.FileSource)
+	err = rows.Scan(&f.Id, &f.UserId, &f.Name, &f.FileId, &f.FileUniqueId, &f.FileSize, &f.FileType, &f.Created, &f.ThumbnailFileId, &f.ThumbnailSource, &f.FileSource, &f.SharedId, &f.IsShared)
 	return f, err
 }
 // Function for getting available directories in directory
@@ -376,7 +375,6 @@ func (db *DataBase) UpdateSource(fileId int, newSource string, isThumbnail bool)
 	}
 	
 	req := fmt.Sprintf("update files set %s = '%s' where id=%d", field, newSource, fileId)
-	log.Print(req)
 	return db.makeQuery(req)
 }
 // Getting user data from database
@@ -457,6 +455,16 @@ func (db *DataBase) DeleteItem(id int, userId int, directoryId int, typeItem str
 	
 }
 
+// Function to change sharing item
+func (db *DataBase) ChangeSharingFile(id int, userId int, share bool) (string, error) {
+	file, err := db.GetFileById(int64(userId), id, false)
+	if err != nil {
+		return "", err
+	}
+	req := fmt.Sprintf("update files set isShared = %t where id=%d and userId=%d returning SharedId", share, file.Id, userId)
+	return db.selectRow(req)
+}
+
 func (db *DataBase) UpdatePath(id int, path string) error {
 	req := fmt.Sprintf("update directories set path = CONCAT('%s', name, '/') where id=%d returning path, directories", path, id)
 	rows, err := db.selectRows(req)
@@ -480,6 +488,20 @@ func (db *DataBase) UpdatePath(id int, path string) error {
 		}
 	}
 	return nil
+}
+
+func (db *DataBase) GetSharedItemId(sharedId string) (int, error) {
+	req := fmt.Sprintf("select id from files where isShared = true and sharedId = '%s'", sharedId)
+	id, err := db.selectRow(req)
+	if err != nil {
+		return -1, err
+	}
+	// If id not found, returning -1
+	if id == "" {
+		return -1, nil
+	}
+	// Returning result of conversion id to integer
+	return strconv.Atoi(id)
 }
 
 // Function for checking hash

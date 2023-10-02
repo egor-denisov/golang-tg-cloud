@@ -45,6 +45,9 @@ func New(db db.DataBase, s storage.Storage) ApiClient {
 	res.router.GET("/createDirectory", res.createDirectory)
 	res.router.GET("/edit", res.editItem)
 	res.router.GET("/delete", res.deleteItem)
+	res.router.GET("/shared", res.getSharedFile)
+	res.router.GET("/share", res.shareFile)
+	res.router.GET("/stopSharing", res.stopSharingFile)
 
 	res.router.OPTIONS("/upload", res.preloader)
 	return res
@@ -129,23 +132,10 @@ func (api *ApiClient) getFileById(context *gin.Context) {
 		ProccessError(context, err)
 		return
 	}
-	// Checking hashing value in database
-	if len(fileData.FileSource) <= 0 {
-		fileData.FileSource, err = api.storage.GetFileURL(fileData.FileId)
-		if err != nil {
-			ProccessError(context, err)
-			return
-		}
-		if err := api.db.UpdateSource(fileData.Id, fileData.FileSource, false); err != nil {
-			ProccessError(context, err)
-			return
-		}
-	}
-	// Getting file as bytes from storage
-	fileBytes, err := api.storage.GetFileAsBytes(fileData.FileSource)
+	fileBytes, err := api.getFileBytes(fileData.Id, fileData.FileId, fileData.FileSource, false)
 	if err != nil {
 		ProccessError(context, err)
-		return 
+		return
 	}
 	// Setting headers and provide file for downloading
 	setHeaders(context)
@@ -177,23 +167,10 @@ func (api *ApiClient) getThumbnailById(context *gin.Context) {
 		ProccessError(context, err)
 		return
 	}
-	// Checking hashing value in database
-	if len(fileData.ThumbnailSource) <= 0 {
-		fileData.ThumbnailSource, err = api.storage.GetFileURL(fileData.ThumbnailFileId)
-		if err != nil {
-			ProccessError(context, err)
-			return
-		}
-		if err := api.db.UpdateSource(fileData.Id, fileData.ThumbnailSource, true); err != nil {
-			ProccessError(context, err)
-			return
-		}
-	}
-	// Getting file as bytes from storage
-	fileBytes, err := api.storage.GetFileAsBytes(fileData.ThumbnailSource)
+	fileBytes, err := api.getFileBytes(fileData.Id, fileData.ThumbnailFileId, fileData.ThumbnailSource, true)
 	if err != nil {
 		ProccessError(context, err)
-		return 
+		return
 	}
 	// Setting headers and provide file for downloading
 	setHeaders(context)
@@ -405,6 +382,84 @@ func (api *ApiClient) deleteItem(context *gin.Context) {
 	context.IndentedJSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
+func (api *ApiClient) shareFile(context *gin.Context) {
+	// Getting user_id and id from data
+	id, err := strconv.Atoi(context.Query("id"))
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	userId, err := strconv.Atoi(context.Query("user_id"))
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	// Checking user hash
+	if err := api.db.CheckHash(userId, context.Query("hash")); err != nil {
+		ProccessError(context, err)
+		return
+	}
+	// Sharing the item
+	sharedId, err := api.db.ChangeSharingFile(id, userId, true)
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	setHeaders(context)
+	context.IndentedJSON(http.StatusOK, gin.H{"shared_id": sharedId})
+}
+
+func (api *ApiClient) stopSharingFile(context *gin.Context) {
+	// Getting user_id and id from data
+	id, err := strconv.Atoi(context.Query("id"))
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	userId, err := strconv.Atoi(context.Query("user_id"))
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	// Checking user hash
+	if err := api.db.CheckHash(userId, context.Query("hash")); err != nil {
+		ProccessError(context, err)
+		return
+	}
+	// Sharing the item
+	sharedId, err := api.db.ChangeSharingFile(id, userId, false)
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	setHeaders(context)
+	context.IndentedJSON(http.StatusOK, gin.H{"shared_id": sharedId})
+}
+
+func (api *ApiClient) getSharedFile(context *gin.Context) {
+	// Get id shared item
+	id, err := api.db.GetSharedItemId(context.Query("shared_id"))
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	// Getting data about the file by id
+	fileData, err := api.db.GetFileById(-1, id, true)
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	fileBytes, err := api.getFileBytes(fileData.Id, fileData.FileId, fileData.FileSource, false)
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	// Setting headers and provide file for downloading
+	setHeaders(context)
+	context.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", fileData.Name))
+	http.ServeContent(context.Writer, context.Request, "filename", time.Now(), bytes.NewReader(fileBytes))
+}
+
 // Function for proccessing errors in working of api
 func ProccessError(context *gin.Context, err error) {
 	log.Print(err)
@@ -433,4 +488,19 @@ func setHeaders(context *gin.Context) {
 	context.Writer.Header().Set("Access-Control-Allow-Methods", "GET,HEAD,OPTIONS,POST,PUT")
 	context.Writer.Header().Set("Access-Control-Allow-Headers", "Access-Control-Allow-Headers, Origin,Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers")
 
+}
+
+func (api *ApiClient) getFileBytes(id int, fileId string, source string, isThumbnail bool) ([]byte, error){
+	// Checking hashing value in database
+	if len(source) <= 0 {
+		source, err := api.storage.GetFileURL(fileId)
+		if err != nil {
+			return nil, err
+		}
+		if err := api.db.UpdateSource(id, source, isThumbnail); err != nil {
+			return nil, err
+		}
+	}
+	// Getting file as bytes from storage
+	return api.storage.GetFileAsBytes(source)
 }
