@@ -490,10 +490,10 @@ func setHeaders(context *gin.Context) {
 
 }
 
-func (api *ApiClient) getFileBytes(id int, fileId string, source string, isThumbnail bool) ([]byte, error){
+func (api *ApiClient) getFileBytes(id int, fileId string, source string, isThumbnail bool) (file []byte, err error){
 	// Checking hashing value in database
 	if len(source) <= 0 {
-		source, err := api.storage.GetFileURL(fileId)
+		source, err = api.storage.GetFileURL(fileId)
 		if err != nil {
 			return nil, err
 		}

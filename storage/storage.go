@@ -5,7 +5,7 @@ import (
 	"log"
 	"main/db"
 	"main/lib/e"
-	. "main/types"
+	"main/lib/h"
 	"net/http"
 	"os"
 
@@ -91,18 +91,7 @@ func (s *Storage) UploadFile(item UploadingItem) (id int, err error) {
 		return -1, err
 	}
 	// Create new instance of file
-	thumbnailFileId := ""
-	if msg.Document.Thumbnail != nil {
-		thumbnailFileId = msg.Document.Thumbnail.FileID
-	}
-	file := File{
-		Name: msg.Document.FileName,
-		FileId: msg.Document.FileID,
-		FileUniqueId: msg.Document.FileUniqueID,
-		FileSize: msg.Document.FileSize,
-		ThumbnailFileId: thumbnailFileId,
-		FileType: msg.Document.MimeType,
-	}
+	file := h.GetFileDataFromMessage(msg)
 	
 	// Upload file to database
 	id, err = s.db.CreateNewFile(int64(item.user_id), item.directoryId, file)

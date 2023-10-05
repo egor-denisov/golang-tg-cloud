@@ -6,6 +6,7 @@ import (
 	"log"
 	"main/db"
 	"main/lib/e"
+	"main/lib/h"
 	. "main/types"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -59,8 +60,20 @@ func (cl *TgClient) proccessMessage(msg *tgbotapi.Message) (err error) {
 	// Defining type of message
 	if msg.IsCommand() {
 		return cl.proccessCommand(msg)
-	}else if msg.Photo != nil || msg.Document != nil {
+	}else if msg.Photo != nil || 
+			 msg.Document != nil || 
+			 msg.Video != nil || 
+			 msg.Audio != nil {
 		return cl.proccessFile(msg)
+	}else if msg.ReplyToMessage != nil {
+		if msg.ReplyToMessage.Photo != nil ||
+		   msg.ReplyToMessage.Document != nil || 
+		   msg.ReplyToMessage.Video != nil || 
+		   msg.ReplyToMessage.Audio != nil {
+		replyMsg := msg.ReplyToMessage
+		replyMsg.From.ID = msg.From.ID
+		return cl.proccessFile(replyMsg)
+	}
 	}else if msg.Text != ""{
 		return cl.proccessText(msg)
 	}
@@ -69,28 +82,8 @@ func (cl *TgClient) proccessMessage(msg *tgbotapi.Message) (err error) {
 }
 // Function for processing message including file
 func (cl *TgClient) proccessFile(msg *tgbotapi.Message) error {
-	var fileInfo File
 	// Setting information about the file
-	if msg.Photo != nil {
-		mainPhoto := msg.Photo[len(msg.Photo)-1]
-		fileInfo = File{
-			Name: "photo" + mainPhoto.FileUniqueID + ".jpg",
-			FileId: mainPhoto.FileID,
-			FileUniqueId: mainPhoto.FileUniqueID,
-			FileSize: mainPhoto.FileSize,
-			ThumbnailFileId: msg.Photo[0].FileID,
-			FileType: "image/jpg",
-		}
-	}else{
-		fileInfo = File{
-			Name: msg.Document.FileName,
-			FileId: msg.Document.FileID,
-			FileUniqueId: msg.Document.FileUniqueID,
-			FileSize: msg.Document.FileSize,
-			ThumbnailFileId: msg.Document.Thumbnail.FileID,
-			FileType: msg.Document.MimeType,
-		}
-	}
+	fileInfo := h.GetFileDataFromMessage(*msg)
 	// Getting current directory
 	directoryId, err := cl.db.GetCurrentDirectory(msg.From.ID)
 	if err != nil {
@@ -106,8 +99,10 @@ func (cl *TgClient) proccessFile(msg *tgbotapi.Message) error {
 // Function for processing message including text
 func (cl *TgClient) proccessText(msg *tgbotapi.Message) error{
 	// If the path starts with './' or equals '../' then we request a directory
-	if msg.Text[:2] == "./" || msg.Text[:3] == "../" {
-		return cl.makeReplyAfterRequestingDirectory(msg.From.ID, msg.Text)
+	if len(msg.Text) > 2 {
+		if msg.Text[:2] == "./" || msg.Text[:3] == "../" {
+			return cl.makeReplyAfterRequestingDirectory(msg.From.ID, msg.Text)
+		}
 	}
 	// Else requesting a file
 	return cl.makeReplyAfterRequestingFile(msg.From.ID, msg.Text)

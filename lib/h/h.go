@@ -2,9 +2,11 @@ package h
 
 import (
 	"encoding/json"
+	. "main/types"
 	"strconv"
 	"strings"
 
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -75,4 +77,37 @@ func CheckHash(hash string, data ...string) bool {
 	}
     err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(s))
     return err == nil
+}
+
+func GetFileDataFromMessage(msg tgbotapi.Message) File {
+	var res File
+	switch {
+		case msg.Audio != nil : 
+			res = makeFileStruct(msg.Audio.FileName, msg.Audio.FileID, msg.Audio.FileUniqueID, msg.Audio.FileSize, msg.Audio.Thumbnail, msg.Audio.MimeType)
+		case msg.Document != nil : 
+			res = makeFileStruct(msg.Document.FileName, msg.Document.FileID, msg.Document.FileUniqueID, msg.Document.FileSize, msg.Document.Thumbnail, msg.Document.MimeType)
+		case msg.Video != nil : 
+			res = makeFileStruct(msg.Video.FileName, msg.Video.FileID, msg.Video.FileUniqueID, msg.Video.FileSize, msg.Video.Thumbnail, msg.Video.MimeType)
+		case msg.Photo != nil : 
+			mainPhoto := msg.Photo[len(msg.Photo)-1]
+			res = makeFileStruct("photo" + mainPhoto.FileUniqueID + ".jpg", mainPhoto.FileID, mainPhoto.FileUniqueID, mainPhoto.FileSize, &msg.Photo[0], "image/jpg")
+		}
+		
+	return res
+}
+
+func makeFileStruct(fileName, fileId, fileUniqueID string, fileSize int, thumbnail *tgbotapi.PhotoSize, mimeType string) File {
+	thumbnailFileId := ""
+	if thumbnail != nil {
+		thumbnailFileId = thumbnail.FileID
+	}
+	file := File{
+		Name: fileName,
+		FileId: fileId,
+		FileUniqueId: fileUniqueID,
+		FileSize: fileSize,
+		ThumbnailFileId: thumbnailFileId,
+		FileType: mimeType,
+	}
+	return file
 }
