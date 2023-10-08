@@ -90,8 +90,20 @@ func (db *DataBase) CreateNewFile(userId int64, directoryId int, file File) (int
 }
 // Function for adding file to directory
 func (db *DataBase) AddFileToDirectory(directoryId int, file File) error {
-	req := fmt.Sprintf("update directories set files = array_append(files, %d), size = size + %d where id = %d", 
-		file.Id, file.FileSize, directoryId)
+	if err := db.addSizeFileToDirectory(directoryId, file.FileSize); err != nil {
+		return err
+	}
+	req := fmt.Sprintf(`update directories set files = array_append(files, %d) where id = %d;`, file.Id, directoryId)
+	return db.makeQuery(req)
+}
+// Function for changing size of directory and its parents
+func (db *DataBase) addSizeFileToDirectory(directoryId int, fileSize int) error {
+	req := fmt.Sprintf(`
+	WITH RECURSIVE r AS (SELECT Id, ParentId FROM directories WHERE id = %d UNION
+		SELECT directories.Id, directories.ParentId FROM directories JOIN r ON directories.Id = r.ParentId)
+   
+		update directories set size = size + (%d) where Id IN (SELECT Id FROM r);
+		`, directoryId, fileSize)
 	return db.makeQuery(req)
 }
 // Function for checking existence of directory by name
@@ -291,7 +303,7 @@ func (db *DataBase) GetAvailableFilesInDiretory(userId int64, directoryId int) (
 	return res, nil
 }
 // Function for getting available items in directory
-func (db *DataBase) GetAvailableItemsInDirectory (userId int64, directoryId int) (DirectoryContent, error) {
+func (db *DataBase) GetAvailableItemsInDirectory(userId int64, directoryId int) (DirectoryContent, error) {
 	// Getting available directories
 	directories, err := db.GetAvailableDirectoriesInDiretory(userId, directoryId)
 	if err != nil {
@@ -446,11 +458,28 @@ func (db *DataBase) UpdateItemName(userId int, id int, directoryId int, newName 
 // Function for erasing item
 func (db *DataBase) DeleteItem(id int, userId int, directoryId int, typeItem string) error {
 	if typeItem != "directory" {
-		// make request if its file
+		// make request if its filev
+		fileInfo, err := db.GetFileById(int64(userId), id, false)
+		if err != nil {
+			return err
+		}
+		if err := db.addSizeFileToDirectory(directoryId, -fileInfo.FileSize); err != nil {
+			return err
+		}
 		req := fmt.Sprintf("update directories set files = array_remove(files, %d) where id=%d and userId=%d", id, directoryId, userId)
 		return db.makeQuery(req)
 	}
-	req := fmt.Sprintf("update directories set directories = array_remove(directories, %d) where id=%d and userId=%d", id, directoryId, userId)
+	directoryInfo, err := db.GetDirectory(id)
+	if err != nil {
+		return err
+	}
+	if err := db.addSizeFileToDirectory(directoryId, -directoryInfo.Size); err != nil {
+		return err
+	}
+	req := fmt.Sprintf(`
+		update directories set directories = array_remove(directories, %d) where id=%d and userId=%d;
+		delete from directories where id=%d
+	`, id, directoryId, userId, id)
 	return db.makeQuery(req)
 	
 }

@@ -493,14 +493,28 @@ func setHeaders(context *gin.Context) {
 func (api *ApiClient) getFileBytes(id int, fileId string, source string, isThumbnail bool) (file []byte, err error){
 	// Checking hashing value in database
 	if len(source) <= 0 {
-		source, err = api.storage.GetFileURL(fileId)
-		if err != nil {
-			return nil, err
-		}
-		if err := api.db.UpdateSource(id, source, isThumbnail); err != nil {
+		if err := api.getAndUpdateSource(id, fileId, isThumbnail); err != nil {
 			return nil, err
 		}
 	}
 	// Getting file as bytes from storage
-	return api.storage.GetFileAsBytes(source)
+	bytes, err := api.storage.GetFileAsBytes(source)
+	if err == nil {
+		return bytes, err
+	}
+	if err.Error() == "can`t get file from storage: cannot get file from this url" {
+		if err := api.getAndUpdateSource(id, fileId, isThumbnail); err != nil {
+			return nil, err
+		}
+		return api.storage.GetFileAsBytes(source)
+	}
+	return nil, err
+}
+
+func (api *ApiClient) getAndUpdateSource(id int, fileId string, isThumbnail bool) error {
+	source, err := api.storage.GetFileURL(fileId)
+	if err != nil {
+		return err
+	}
+	return api.db.UpdateSource(id, source, isThumbnail)
 }

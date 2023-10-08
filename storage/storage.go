@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"main/db"
@@ -64,6 +65,9 @@ func (s *Storage) GetFileAsBytes(url string) (fileBytes []byte, err error) {
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
+	}
+	if resp.StatusCode == 404 {
+		return nil, fmt.Errorf("cannot get file from this url")
 	}
 	defer resp.Body.Close()
 	// Return bytes of content
