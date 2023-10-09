@@ -87,7 +87,7 @@ func resetCommand(cl *TgClient, msg *tgbotapi.Message) error {
 		Keyboard: createEmptyKeyboard(),
 	}
 	// Resetting user data from database
-	if err := cl.db.ResetUserData(msg.From.ID); err != nil {
+	if _, err := cl.db.ResetUserData(msg.From.ID); err != nil {
 		return err
 	}
 	// Sending replying message

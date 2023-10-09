@@ -48,6 +48,7 @@ func New(db db.DataBase, s storage.Storage) ApiClient {
 	res.router.GET("/shared", res.getSharedFile)
 	res.router.GET("/share", res.shareFile)
 	res.router.GET("/stopSharing", res.stopSharingFile)
+	res.router.GET("/reset", res.resetData)
 
 	res.router.OPTIONS("/upload", res.preloader)
 	return res
@@ -458,6 +459,30 @@ func (api *ApiClient) getSharedFile(context *gin.Context) {
 	setHeaders(context)
 	context.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", fileData.Name))
 	http.ServeContent(context.Writer, context.Request, "filename", time.Now(), bytes.NewReader(fileBytes))
+}
+
+// function for reseting user data
+func (api *ApiClient) resetData(context *gin.Context) {
+	// Getting user_id and hash from data
+	userId, err := strconv.Atoi(context.Query("user_id"))
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	// Checking user hash
+	if err := api.db.CheckHash(userId, context.Query("hash")); err != nil {
+		ProccessError(context, err)
+		return
+	}
+
+	setHeaders(context)
+	// Deleting data
+	id, err := api.db.ResetUserData(int64(userId))
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	context.IndentedJSON(http.StatusOK, gin.H{"current_directory": id})
 }
 
 // Function for proccessing errors in working of api

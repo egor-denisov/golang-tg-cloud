@@ -364,20 +364,24 @@ func (db *DataBase) GetNamesArray(userId int, directoryId int, name string) ([]s
 	return res, nil
 }
 // Reseting the root directory from the database for user
-func (db *DataBase) ResetUserData(userId int64) error {
+func (db *DataBase) ResetUserData(userId int64) (int, error) {
 	// Creating new root directory for user
 	directoryId, err := db.CreateRootDirectory(Directory{Name : "(root)/", UserId: int(userId)})
 	if err != nil {
-		return err
+		return -1, err
 	}
 	// Updating the root directory for user
 	req := fmt.Sprintf("update users set currentDirectory = %s where userId=%d", directoryId, userId)
 	if err := db.makeQuery(req); err != nil {
-		return err
+		return -1, err
 	}
 	// Deleting all user`s directories except the new root directory
 	req = fmt.Sprintf("delete from directories where userId=%d and id != %s", userId, directoryId)
-	return db.makeQuery(req)
+	if err := db.makeQuery(req); err != nil {
+		return -1, err
+	}
+	// Returning new root directory id
+	return strconv.Atoi(directoryId)
 }
 // Updating source to file in database
 func (db *DataBase) UpdateSource(fileId int, newSource string, isThumbnail bool) error {
