@@ -23,3 +23,8 @@ func SetEnvironment() {
 	DBNAME   = os.Getenv("DB_NAME")
 	BOT_TOKEN = os.Getenv("TG_BOT_TOKEN")
 }
+
+// Limits for api
+
+var DOWNLOADING_LIMIT = 20971520
+var UPLOADING_LIMIT = 52428800

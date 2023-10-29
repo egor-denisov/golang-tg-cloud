@@ -117,3 +117,13 @@ func (s *Storage) AddToUploadingQueue(idChannel chan int, path string, filename 
 		directoryId: directoryId,
 	}
 }
+
+// Function upload a file to the tg server by sending message to user
+func (s *Storage) SendFileInTelegram(userId int, fileId string) (err error) {
+	defer func() { err = e.WrapIfErr("can`t send file to user", err) }()
+
+	// Create new instance of document and sending it to user
+	document := tgbotapi.NewDocument(int64(userId), tgbotapi.FileID(fileId))
+	_, err = s.bot.Send(document)
+	return err
+}

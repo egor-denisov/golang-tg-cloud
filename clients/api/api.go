@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"main/db"
+	env "main/environment"
 	"main/lib/h"
 	"main/storage"
 	. "main/types"
@@ -34,21 +35,23 @@ func New(db db.DataBase, s storage.Storage) ApiClient {
 		db:      db,
 		storage: s,
 	}
-	// Setting route for the router
+
+	// Setting routes for the router
+	res.router.GET("/shared", res.getSharedFile)
+	res.router.GET("/auth", res.authorization)
 	res.router.GET("/directory", res.getDirecoryById)
 	res.router.GET("/fileInfo", res.getFileInfoById)
 	res.router.GET("/file", res.getFileById)
 	res.router.GET("/thumbnail", res.getThumbnailById)
 	res.router.POST("/upload", res.uploadFile)
 	res.router.GET("/available", res.getAvailableItems)
-	res.router.GET("/auth", res.authorization)
 	res.router.GET("/createDirectory", res.createDirectory)
 	res.router.GET("/edit", res.editItem)
 	res.router.GET("/delete", res.deleteItem)
-	res.router.GET("/shared", res.getSharedFile)
 	res.router.GET("/share", res.shareFile)
 	res.router.GET("/stopSharing", res.stopSharingFile)
 	res.router.GET("/reset", res.resetData)
+	res.router.GET("/getInTelegram", res.sendFileInTelegram)
 
 	res.router.OPTIONS("/upload", res.preloader)
 	return res
@@ -133,6 +136,10 @@ func (api *ApiClient) getFileById(context *gin.Context) {
 		ProccessError(context, err)
 		return
 	}
+	if fileData.FileSize >= env.DOWNLOADING_LIMIT {
+		ProccessError(context, fmt.Errorf("file is larger than limit"))
+		return
+	}
 	fileBytes, err := api.getFileBytes(fileData.Id, fileData.FileId, fileData.FileSource, false)
 	if err != nil {
 		ProccessError(context, err)
@@ -168,6 +175,10 @@ func (api *ApiClient) getThumbnailById(context *gin.Context) {
 		ProccessError(context, err)
 		return
 	}
+	if fileData.FileSize >= env.DOWNLOADING_LIMIT {
+		ProccessError(context, fmt.Errorf("file is larger than limit"))
+		return
+	}
 	fileBytes, err := api.getFileBytes(fileData.Id, fileData.ThumbnailFileId, fileData.ThumbnailSource, true)
 	if err != nil {
 		ProccessError(context, err)
@@ -181,6 +192,17 @@ func (api *ApiClient) getThumbnailById(context *gin.Context) {
 // Function for sending headers for uploading files
 func (api *ApiClient) preloader(context *gin.Context) {
 	setHeaders(context)
+	// Getting uploaded file
+	_, headers, err := context.Request.FormFile("file")
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	// Checking file size
+	if headers.Size > int64(env.UPLOADING_LIMIT) {
+		ProccessError(context, fmt.Errorf("file is larger than limit"))
+		return
+	}
 }
 
 // Function for uploading new files 
@@ -190,6 +212,11 @@ func (api *ApiClient) uploadFile(context *gin.Context) {
 	_, headers, err := context.Request.FormFile("file")
 	if err != nil {
 		ProccessError(context, err)
+		return
+	}
+	// Checking file size
+	if headers.Size > int64(env.UPLOADING_LIMIT) {
+		ProccessError(context, fmt.Errorf("file is larger than limit"))
 		return
 	}
 	// Getting user id
@@ -383,6 +410,39 @@ func (api *ApiClient) deleteItem(context *gin.Context) {
 	context.IndentedJSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
+// Function for getting file in telegram
+func (api *ApiClient) sendFileInTelegram(context *gin.Context) {
+	// Getting user_id and id from data
+	id, err := strconv.Atoi(context.Query("id"))
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	userId, err := strconv.Atoi(context.Query("user_id"))
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	// Checking user hash
+	if err := api.db.CheckHash(userId, context.Query("hash")); err != nil {
+		ProccessError(context, err)
+		return
+	}
+	// Getting data about the file by id
+	fileData, err := api.db.GetFileById(int64(userId), id, false)
+	if err != nil {
+		ProccessError(context, err)
+		return
+	}
+	setHeaders(context)
+	// Deleting the item
+	if err := api.storage.SendFileInTelegram(userId, fileData.FileId); err != nil {
+		ProccessError(context, err)
+		return
+	}
+	context.IndentedJSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
 func (api *ApiClient) shareFile(context *gin.Context) {
 	// Getting user_id and id from data
 	id, err := strconv.Atoi(context.Query("id"))
@@ -450,6 +510,10 @@ func (api *ApiClient) getSharedFile(context *gin.Context) {
 		ProccessError(context, err)
 		return
 	}
+	if fileData.FileSize >= env.DOWNLOADING_LIMIT {
+		ProccessError(context, fmt.Errorf("file is larger than limit"))
+		return
+	}
 	fileBytes, err := api.getFileBytes(fileData.Id, fileData.FileId, fileData.FileSource, false)
 	if err != nil {
 		ProccessError(context, err)
@@ -502,6 +566,8 @@ func ProccessError(context *gin.Context, err error) {
 		context.IndentedJSON(http.StatusNotAcceptable, "You can`t make this request")
 	case "can`t upload file to storage":
 		context.IndentedJSON(http.StatusNotAcceptable, "File with this name already in directory")
+	case "file is larger than limit":
+		context.IndentedJSON(http.StatusNotAcceptable, "File is larger than limit")
 	default: 
 		context.IndentedJSON(http.StatusInternalServerError, err.Error())
 	}
@@ -518,7 +584,7 @@ func setHeaders(context *gin.Context) {
 func (api *ApiClient) getFileBytes(id int, fileId string, source string, isThumbnail bool) (file []byte, err error){
 	// Checking hashing value in database
 	if len(source) <= 0 {
-		if err := api.getAndUpdateSource(id, fileId, isThumbnail); err != nil {
+		if source, err = api.getAndUpdateSource(id, fileId, isThumbnail); err != nil {
 			return nil, err
 		}
 	}
@@ -528,7 +594,7 @@ func (api *ApiClient) getFileBytes(id int, fileId string, source string, isThumb
 		return bytes, err
 	}
 	if err.Error() == "can`t get file from storage: cannot get file from this url" {
-		if err := api.getAndUpdateSource(id, fileId, isThumbnail); err != nil {
+		if source, err = api.getAndUpdateSource(id, fileId, isThumbnail); err != nil {
 			return nil, err
 		}
 		return api.storage.GetFileAsBytes(source)
@@ -536,10 +602,10 @@ func (api *ApiClient) getFileBytes(id int, fileId string, source string, isThumb
 	return nil, err
 }
 
-func (api *ApiClient) getAndUpdateSource(id int, fileId string, isThumbnail bool) error {
+func (api *ApiClient) getAndUpdateSource(id int, fileId string, isThumbnail bool) (string, error) {
 	source, err := api.storage.GetFileURL(fileId)
 	if err != nil {
-		return err
+		return "", err
 	}
-	return api.db.UpdateSource(id, source, isThumbnail)
+	return source, api.db.UpdateSource(id, source, isThumbnail)
 }
